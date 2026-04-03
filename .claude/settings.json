@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=\"$CLAUDE_FILE_PATH\"; if [ -n \"$file\" ]; then case \"$file\" in *.py) cd /Users/nicopfammatter/Documents/swaarm/backend 2>/dev/null && uv run ruff format \"$file\" 2>/dev/null && uv run ruff check --fix \"$file\" 2>/dev/null; echo '[hook] Python formatted & linted' ;; *.ts|*.tsx|*.js|*.jsx) cd /Users/nicopfammatter/Documents/swaarm/frontend 2>/dev/null && npx prettier --write \"$file\" 2>/dev/null; echo '[hook] JS/TS formatted' ;; esac; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_TOOL_INPUT\" in *'git push --force'*|*'git push -f'*|*'rm -rf /'*|*'git reset --hard'*) echo 'BLOCKED: Destructive operation detected'; exit 2 ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
