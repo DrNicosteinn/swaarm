@@ -283,8 +283,9 @@ class SimulationEngine:
             # Generate feed
             feed = await self.platform.generate_feed(persona.id, persona, round_num, feed_size=5)
 
-            if not feed and round_num > 1:
-                # No feed available — do nothing
+            # Creators can always post even without feed (they create original content)
+            # Responders need feed to react to
+            if not feed and persona.agent_tier != AgentTier.POWER_CREATOR and round_num > 1:
                 return AgentAction(
                     agent_id=persona.id,
                     round_number=round_num,
@@ -398,6 +399,10 @@ class SimulationEngine:
         if persona.interests:
             parts.append(f"\nINTERESSEN: {', '.join(persona.interests[:5])}")
 
+        # Scenario context (so agents know WHAT they're discussing)
+        if self.config.scenario_text:
+            parts.append(f"\nAKTUELLES THEMA: {self.config.scenario_text[:300]}")
+
         parts.extend(
             [
                 "",
@@ -407,6 +412,7 @@ class SimulationEngine:
                 "- Du änderst deine Grundmeinungen NICHT leichtfertig",
                 "- Wähle genau EINE Aktion pro Runde",
                 "- Alle Inhalte auf Deutsch",
+                "- Beziehe dich auf das aktuelle Thema wenn relevant",
                 "",
                 self.platform.get_platform_rules_prompt(),
             ]
@@ -478,11 +484,15 @@ async def create_and_run_simulation(
     personas: list[Persona],
     llm: LLMProvider,
     event_callback: EventCallback | None = None,
+    seed_posts: list[str] | None = None,
 ) -> SimulationResult:
     """Convenience function to set up and run a simulation end-to-end.
 
     Creates the DB, graph, platform, and engine, then runs the simulation.
+    Seed posts are injected as round 0 posts so agents have content to react to.
     """
+    import uuid as _uuid
+
     from app.models.simulation import PlatformType
     from app.simulation.platforms.public import PublicNetworkPlatform
 
@@ -506,6 +516,19 @@ async def create_and_run_simulation(
     # Insert personas into DB
     users = [(p.id, p.name, p.model_dump_json(), "{}") for p in personas]
     await db.insert_users_batch(users)
+
+    # Inject seed posts (round 0) so agents have content to react to
+    if seed_posts:
+        for i, content in enumerate(seed_posts):
+            author_id = personas[i % len(personas)].id if personas else "system"
+            post_id = f"seed-{_uuid.uuid4().hex[:8]}"
+            await db.insert_post(
+                post_id=post_id,
+                author_id=author_id,
+                content=content,
+                created_round=0,
+            )
+        logger.info(f"Injected {len(seed_posts)} seed posts into simulation")
 
     # Create and run engine
     engine = SimulationEngine(

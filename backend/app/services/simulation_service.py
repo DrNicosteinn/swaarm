@@ -103,12 +103,13 @@ async def run_simulation_job(
         seed=42,
     )
 
-    # Run simulation
+    # Run simulation with seed posts from prompt builder
     logger.info(f"Running simulation {simulation_id}...")
     result = await create_and_run_simulation(
         config=sim_config,
         personas=personas,
         llm=llm,
+        seed_posts=request.scenario.seed_posts or None,
     )
 
     logger.info(
