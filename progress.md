@@ -84,6 +84,20 @@
 - API: /start, /status/{id}, /list
 - In-Memory Job Tracking (→ Supabase in Produktion)
 
+### Issue #8: Live-View ✅
+- Backend: ConnectionManager (per-Client Queue, Backpressure)
+- Backend: WebSocket Endpoint mit JWT Auth
+- Frontend: SimulationPage (Split-View 60/40: Graph + Feed + Metriken)
+- Frontend: LiveFeed (scrollende Aktions-Liste mit Sentiment-Farben)
+- Frontend: MetricsBar (Fortschritt, Sentiment, aktive Agents)
+- Frontend: useSimulationStream Hook (Auto-Reconnect, Backoff)
+- react-force-graph-2d installiert
+- Bauplan: docs/LIVE_VIEW_BAUPLAN.md
+
+### Issue #9: Report Dashboard & PDF — NEXT
+
+**Running total: 161 Tests, 0 Lint-Fehler**
+
 ---
 
 ## Dokumentation

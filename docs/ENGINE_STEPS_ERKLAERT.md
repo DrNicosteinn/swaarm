@@ -794,3 +794,105 @@ Alle Endpoints prüfen die User-ID — ein User sieht nur seine eigenen Simulati
 ### Warum noch kein ARQ/Redis?
 
 ARQ (die Redis-basierte Job Queue aus dem Bauplan) hätte eine Redis-Instanz erfordert. Für den MVP nutzen wir FastAPI's eingebaute BackgroundTasks — einfacher, keine zusätzliche Infrastruktur. ARQ wird für Produktion nachgerüstet wenn wir mehrere Worker und Job-Persistenz brauchen.
+
+---
+
+## Issue #8: Live-View (WebSocket + Split-View UI)
+
+**Dateien Backend:** `backend/app/services/ws_manager.py`, `backend/app/api/ws.py`
+**Dateien Frontend:** `frontend/src/pages/SimulationPage.tsx`, `frontend/src/components/simulation/LiveFeed.tsx`, `frontend/src/components/simulation/MetricsBar.tsx`, `frontend/src/hooks/useSimulationStream.ts`, `frontend/src/lib/ws-events.ts`
+**Bauplan:** `docs/LIVE_VIEW_BAUPLAN.md`
+
+### Was wurde gebaut?
+
+Das Echtzeit-System das dem Kunden die laufende Simulation live zeigt — ein Split-View mit Netzwerk-Graph, scrollendem Feed und Metriken.
+
+### Recherche-Ergebnisse (vor dem Bau)
+
+Drei parallele Recherche-Agents haben untersucht:
+
+1. **MiroFish-Analyse:** MiroFish zeigt während der Simulation NUR einen scrollenden Feed — keinen Live-Netzwerk-Graph. Der Knowledge Graph ist nur für die Vorbereitungsphase. Das ist eine grosse Differenzierungs-Chance.
+
+2. **Library-Vergleich:** Wir haben 6 Libraries verglichen (D3.js raw, react-force-graph, Sigma.js, Cytoscape, vis-network, Reagraph). Ergebnis: `react-force-graph-2d` — Canvas-basiert, d3-force Physik, handles 5000+ Nodes, React-native API.
+
+3. **WebSocket-Patterns:** Raw WebSocket (kein Socket.IO — unnötiger Overhead), JWT Auth via Query-Parameter, per-Client Queue mit Backpressure, Event-Batching pro Runde.
+
+### Backend: ConnectionManager
+
+Das Herzstück der WebSocket-Infrastruktur. Verwaltet alle verbundenen Clients pro Simulation.
+
+**Wie es funktioniert:**
+- Ein Dictionary mappt `simulation_id → Set[ConnectedClient]`
+- Jeder Client bekommt eine eigene `asyncio.Queue` (max 256 Messages)
+- Ein Background-Task pro Client draint die Queue und sendet via WebSocket
+- Wenn die Queue voll ist (langsamer Client): älteste Message droppen, neue einfügen
+- Send-Timeout: 5 Sekunden — danach Client als "zu langsam" behandeln
+
+**Warum per-Client Queue?** Ohne Queue würde ein langsamer Client die `broadcast()` Methode blockieren — und damit die gesamte Simulation verlangsamen. Mit Queue kann die Simulation so schnell laufen wie nötig, und langsame Clients verpassen einfach Events.
+
+### Backend: WebSocket Endpoint
+
+`/ws/simulation/{sim_id}?token=JWT`
+
+1. JWT wird aus dem Query-Parameter extrahiert (WebSocket Browser-API unterstützt keine Custom Headers)
+2. Token wird via Supabase `get_user()` validiert
+3. Bei ungültigem Token: WebSocket mit Code 4001 schliessen (kein Accept)
+4. Bei gültigem Token: Client in ConnectionManager registrieren
+5. Ping/Pong Keepalive (Client sendet "ping", Server antwortet "pong")
+
+### Frontend: SimulationPage Layout
+
+Split-View:
+```
++------------------------------------------+
+| Header: Swaarm | Simulation sim-abc123   |
++------------------------------------------+
+| MetricsBar: Runde 23/50 | Stimmung | ... |
++-------------------+----------------------+
+|                   |  Live-Feed            |
+| Netzwerk-Graph    |  (scrollende Posts)   |
+| (60% Breite)      |  (40% Breite, 70% H) |
+|                   +----------------------+
+|                   |  Statistiken          |
+|                   |  Posts: 12 Likes: 45  |
++-------------------+----------------------+
+```
+
+### Frontend: LiveFeed-Komponente
+
+Scrollende Liste der Agent-Aktionen:
+- Filtert "do_nothing" raus (nur relevante Aktionen zeigen)
+- Sentiment-Farbe am linken Rand (grün/rot/grau)
+- Agent-Name + Aktion + Sentiment-Score
+- Post-Inhalt (max 280 Zeichen)
+- Max 50 Einträge im DOM (ältere werden entfernt)
+
+### Frontend: MetricsBar
+
+Am oberen Rand der Simulation-Seite:
+- Connection-Status (Live/Verbinde.../Getrennt/Fehler) mit farbigem Punkt
+- Rundenzähler mit Progress Bar
+- Sentiment-Anzeige (Positiv/Neutral/Negativ)
+- Aktive Agents diese Runde
+
+### Frontend: useSimulationStream Hook
+
+Custom React Hook der die WebSocket-Verbindung verwaltet:
+- Auto-Connect wenn `simulationId` und `token` vorhanden
+- Auto-Reconnect mit Exponential Backoff (1s, 2s, 4s, 8s... max 30s)
+- Max 10 Reconnect-Versuche
+- Ping alle 30 Sekunden (Keepalive)
+- Bei Auth-Fehler (Code 4001): kein Retry, Status "error"
+- State: `currentRound`, `totalRounds`, `actions[]`, `avgSentiment`, `activeCounts[]`
+
+### Was noch fehlt (Netzwerk-Graph)
+
+Der Graph-Platzhalter ist vorhanden (dunkelgrauer Bereich links). Der eigentliche `react-force-graph-2d` Graph wird implementiert wenn die Simulation echte Graph-Events emittiert. Die Library ist bereits installiert.
+
+### Entscheidung: Kein Socket.IO
+
+Wir nutzen native WebSocket statt Socket.IO weil:
+- FastAPI hat native WebSocket-Unterstützung
+- Socket.IO fügt ein eigenes Protokoll hinzu (unnötiger Overhead)
+- Unsere Events sind einfach (JSON per Runde)
+- Weniger Dependencies = weniger Angriffsfläche
