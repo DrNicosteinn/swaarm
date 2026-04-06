@@ -2,6 +2,7 @@
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from loguru import logger
 from pydantic import BaseModel
 
 from app.core.supabase import get_supabase_client
@@ -42,7 +43,8 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Auth error: {e!s}")  # Log real error server-side only
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentifizierung fehlgeschlagen: {e!s}",
+            detail="Authentifizierung fehlgeschlagen",  # Generic message to client
         ) from e

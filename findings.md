@@ -860,3 +860,1766 @@ Listed as key use case ("PR crisis simulation"). Claims "95%+ accuracy on crisis
 - Benzinga: Predictive Audience Simulation Platform (Apr 2026)
 - AI Journal: SaaS platform launch (Oct 2025)
 - Socialtrait blog: AI trends, heatmaps methodology
+
+## Willingness Scoring / Agent Activation Research (2026-04-05)
+
+### 1. Socialtrait's Approach (US Patent 12412128B1)
+
+**Unified Willingness Score Formula:**
+```
+s_unified = s_persona_willingness * e^(-lambda * (s_conversation_willingness - s_persona_willingness))
+```
+
+**Components:**
+- `s_persona_willingness` (0-1): Intrinsic engagement tendency. Represents the degree of willingness of the virtual persona to participate in any conversation at any point in time, regardless of conversation details. Derived from personality traits like introversion/extraversion and openness.
+- `s_conversation_willingness` (0-1): Context-dependent participation likelihood. Represents how the current conversation influences the willingness of the candidate agent to respond. Adjusts dynamically using reinforcement learning models.
+- `lambda`: Exponential smoothing parameter modulating the influence of conversational context on the persona's base willingness.
+- `e`: Euler's number (mathematical constant ~2.718)
+
+**How lambda works:**
+- When `s_conversation > s_persona`: the exponential term `e^(-lambda * positive_value)` < 1, so `s_unified < s_persona`. The conversation context dampens inherent willingness (e.g., boring conversation for an otherwise chatty person).
+- When `s_conversation < s_persona`: the exponential term `e^(-lambda * negative_value)` > 1, so `s_unified > s_persona`. The conversation context amplifies willingness beyond base level (e.g., controversial topic activating a normally quiet person).
+- When `s_conversation == s_persona`: `s_unified = s_persona` (no contextual adjustment).
+- Higher lambda = stronger contextual influence; lower lambda = persona dominates.
+
+**Selection mechanism:**
+- Agents with unified scores exceeding a predefined threshold qualify as "willing candidate agents"
+- System selects top m responders (m randomly sampled from a distribution, typically mean=3)
+- Uses structured generation with normalized log probabilities to rank candidates by confidence
+
+**Takeaway for Swaarm:** This is an elegant, computationally cheap formula. The exponential coupling between persona and context is smart -- it preserves persona dominance while allowing contextual modulation. We should adopt a similar two-factor approach.
+
+---
+
+### 2. Real-World Social Media Activity Distributions
+
+**The 90-9-1 Rule (Participation Inequality):**
+- 90% lurkers (consume content only)
+- 9% contributors (occasionally engage: like, comment, share)
+- 1% creators (produce most original content)
+- Source: Nielsen Norman Group, validated across many platforms
+- Modern data suggests it may be closer to 70-20-10 on some platforms (up to 23% creating content)
+- In health communities: Superusers generate 59-75% of posts, Contributors 24-37%, Lurkers 1-8%
+
+**Twitter/X Posting Frequency:**
+- Median user: ~2.16 tweets per week (2024 data, down from 5.04 in 2021)
+- 10% of users generate 92% of all tweets (extreme power law)
+- Most highly active users: ~157 tweets/month (~5.2/day)
+- Average user posts approximately once per month
+- Distribution follows a power law with lognormal cutoff
+- Inter-tweet intervals: power law with exponential cutoff
+- Retweet frequency: power law with exponent 0.6-0.7
+
+**LinkedIn Posting Frequency:**
+- Recommended sweet spot: 2-5 posts per week
+- Average brand: 5-7 image posts + 2-4 video posts per month
+- Most professionals: significantly less than daily
+- Moving from 1 to 2-5 posts/week yields ~1,182 more impressions per post
+- Much lower volume than Twitter overall
+
+**Implications for simulation at 50k agents:**
+- Per round (simulating ~1 hour of real time):
+  - ~500 agents (1%) should be "creators" who might post
+  - Of those, maybe 10-20% actually post in a given hour = 50-100 posts per round
+  - ~4,500 agents (9%) are "contributors" who might react (like/comment/share)
+  - Of those, maybe 5-15% engage per round = 225-675 reactions
+  - ~45,000 agents (90%) are lurkers who read but don't act
+- Total active agents per round: ~300-800 (0.6-1.6% of population)
+
+---
+
+### 3. Factors Determining Agent Activation
+
+**A. Personality (Big Five Model):**
+- Extraversion: strongest predictor of posting frequency. High-E agents post more, comment more, share more.
+- Openness: correlated with more diverse content engagement and information sharing.
+- Neuroticism: positively associated with social media use but more passive/reactive (emotional posting).
+- Agreeableness: negative relationship with information sharing (less likely to post controversial takes).
+- Conscientiousness: negative relationship with frequency (more deliberate, less impulsive posting).
+- Research confirms introverts cluster in "very rarely post" and "rarely post" categories.
+
+**B. Topic Relevance:**
+- Match between post content and agent's interests/expertise.
+- Domain experts are more likely to engage on their topic.
+- Irrelevant content = low activation, even for extroverts.
+
+**C. Network Effects (Social Influence):**
+- Did someone the agent follows post? (Direct feed exposure)
+- Granovetter's Threshold Model: each agent has a threshold = proportion of network neighbors who must act before they will act.
+- Cascade dynamics: early adopters activate, which pushes borderline agents over their threshold.
+- Network position matters: high-centrality agents see more content, get activated more.
+
+**D. Emotional Engagement (Controversy/Virality):**
+- Controversial or emotionally charged content increases activation probability.
+- Negative sentiment drives more engagement than positive (outrage effect).
+- Moral-emotional language in content amplifies sharing by 20% per moral-emotional word (Brady et al., 2017).
+
+**E. Fatigue/Cooldown:**
+- Agents should not post every round -- implement exponential decay cooldown.
+- Recent activity should reduce activation probability.
+- Model as: `fatigue_factor = e^(-decay_rate * rounds_since_last_action)`
+- Prevents unrealistic hyper-active agents.
+
+**F. Time-of-Day Patterns:**
+- Activity peaks: morning (7-9am), lunch (12-1pm), evening (7-9pm).
+- Night hours (11pm-6am) should have near-zero activation.
+- Weekend vs. weekday patterns differ by platform.
+
+---
+
+### 4. Academic Approaches to Agent Activation
+
+**4.1 Activation Regimes (Alizadeh & Cioffi-Revilla, JASSS 2015)**
+
+Four asynchronous updating schemes compared:
+
+1. **Uniform Activation:** All agents activated exactly once per turn in random order (sampling without replacement). Most common baseline.
+2. **Random Activation:** Agents selected with replacement for n/2 pairs per turn. Some agents may activate multiple times, others zero.
+3. **Poisson-1 (Extreme-Biased):** Agents with extreme opinions activate more frequently. lambda_i proportional to |opinion|. Counterintuitive result: produces FEWER extremists.
+4. **Poisson-2 (Moderate-Biased):** Moderate agents activate more frequently. Produces MORE extremists (counterintuitive).
+
+Key finding: activation regime significantly affects outcomes (p < 0.05 across all measures). The choice of who speaks when is NOT just an implementation detail -- it fundamentally shapes simulation outcomes.
+
+**Takeaway:** State-driven activation (where agent properties influence activation frequency) is more realistic than random/uniform. Our willingness score is essentially a state-driven Poisson activation regime.
+
+**4.2 Bounded Confidence Models (Hegselmann-Krause)**
+
+- Agents only interact with others whose opinions are within a "confidence bound" epsilon.
+- Leads naturally to: consensus (large epsilon), polarization (medium epsilon), or fragmentation (small epsilon).
+- Each agent updates opinion to mean of all neighbors within confidence bound.
+- Critical for preventing "everyone agrees" -- agents with very different views simply don't influence each other.
+
+**4.3 Granovetter's Threshold Model:**
+
+- Binary choice: participate or not.
+- Each agent has a threshold (proportion of others who must act first).
+- Threshold drawn from a distribution (often normal or uniform).
+- Cascade dynamics: low-threshold agents go first, pushing others past their thresholds.
+- Application: viral content spreading, protest dynamics, adoption cascades.
+- Key insight: small perturbations in threshold distribution can lead to dramatically different collective outcomes.
+
+**4.4 Mesa ABM Schedulers (Python framework):**
+
+- `RandomActivation`: Each agent activated once per step, random order.
+- `SimultaneousActivation`: All agents compute next state, then all update simultaneously.
+- `StagedActivation`: Agents execute multiple stages per step (e.g., observe, decide, act).
+- Mesa 3 simplified to: `model.agents.shuffle_do("step")` for random, `model.agents.do("step")` for sequential.
+
+**Recommendation for Swaarm:** Use a hybrid approach:
+- Probabilistic activation (not uniform/random) based on willingness scores
+- Staged execution within a round: (1) compute willingness, (2) select active agents, (3) generate actions, (4) propagate effects
+
+---
+
+### 5. Preventing the "Everyone Agrees" Problem
+
+**5.1 The Core Problem with LLM Agents:**
+- LLMs trained with RLHF develop sycophantic tendencies -- they prefer agreeable responses.
+- In multi-agent debate: disagreement rate decreases as debate progresses, correlated with performance degradation.
+- LLMs produce "average persona" behavior -- lower variance than real humans.
+- Tendency to overrepresent perspectives of wealthy, young, politically liberal individuals.
+- Wu et al.: LLM agents display lower variance and reduced behavioral diversity vs. humans.
+
+**5.2 Mitigation Strategies:**
+
+**A. Strong Persona Anchoring:**
+- Define explicit opinion values (not just personality traits) per agent.
+- Include "stubbornness" parameter: probability of ignoring social influence.
+- Some agents should be "zealots" who never change opinion (5-10% of population).
+
+**B. Bounded Confidence Mechanism:**
+- Agents only process/respond to content within their "confidence bound."
+- Very different opinions are ignored or trigger counter-reactions.
+- Implement negative influence: exposure to very different views can push agents AWAY (backfire effect).
+
+**C. Prompt Engineering for Diversity:**
+- Avoid generic prompts. Use highly specific persona descriptions.
+- Include explicit opinion anchors: "You believe X strongly and are skeptical of Y."
+- Add contrarian instructions for some agents: "You tend to disagree with popular opinions."
+- Use temperature variation: higher temperature for creative/controversial agents.
+
+**D. Structural Diversity:**
+- Initialize opinion distribution from real survey data (not random).
+- Use echo chamber topology: agents primarily connected to like-minded others.
+- Limit cross-group exposure to prevent unrealistic convergence.
+
+**E. Smaller/Different Models:**
+- Mix model providers to get different "personality" baselines.
+- Smaller models may actually be better for behavioral diversity.
+- Use function calling / structured output to constrain response format.
+
+**F. Mechanical Safeguards:**
+- Track opinion drift per agent. If opinion changes more than X% from initial, apply resistance.
+- "Opinion inertia" parameter: weighted average of current opinion and initial opinion.
+- Formula: `new_opinion = alpha * social_influence + (1 - alpha) * initial_opinion` where alpha is small (0.1-0.3).
+
+**5.3 From the Literature:**
+- SocioVerse approach: initialize agents from millions of real-world user profiles.
+- Role-specific memory structures storing relevant knowledge.
+- Focus validation on collective patterns (distribution shapes) rather than individual trajectories.
+- Hybrid approach: combine LLM reasoning with classical rule-based opinion dynamics.
+
+---
+
+### 6. Performance at 50k Agents
+
+**6.1 Vectorized Activation Scoring with NumPy:**
+
+The activation computation is embarrassingly parallel -- all agents can be scored simultaneously:
+
+```python
+import numpy as np
+
+# Agent properties as arrays (50k x N_features)
+persona_willingness = np.array([...])      # shape: (50000,)
+conversation_willingness = np.array([...]) # shape: (50000,)
+lambda_param = np.array([...])             # shape: (50000,) or scalar
+cooldown_factor = np.array([...])          # shape: (50000,)
+
+# Vectorized unified score computation -- all 50k agents at once
+unified_scores = persona_willingness * np.exp(
+    -lambda_param * (conversation_willingness - persona_willingness)
+) * cooldown_factor
+
+# Select active agents via threshold or top-k
+threshold = 0.6
+active_mask = unified_scores > threshold
+# OR probabilistic: each agent's score = probability of activation
+random_draws = np.random.random(50000)
+active_mask = random_draws < unified_scores
+
+active_agent_ids = np.where(active_mask)[0]
+```
+
+**Performance estimates:**
+- NumPy vectorized computation for 50k floats: < 1ms
+- Even with 10 features per agent: < 5ms
+- The bottleneck is NOT activation scoring -- it's the LLM calls for active agents
+- If ~300-800 agents are active per round, that's 300-800 LLM calls (or batched)
+
+**6.2 Optimization Strategy:**
+- Store all agent state in NumPy arrays (not Python objects).
+- Compute activation scores vectorized.
+- Only instantiate full agent context for active agents (the 1-2%).
+- Use batch LLM calls for active agents.
+- Social graph operations (networkx) may be the real bottleneck at 50k nodes -- consider sparse adjacency matrices.
+
+**6.3 Expected Active Agents Per Round:**
+
+For realistic simulation matching real-world distributions:
+- Creators (1%): 500 agents with high base willingness
+- Contributors (9%): 4,500 agents with medium base willingness
+- Lurkers (90%): 45,000 agents with very low base willingness
+
+Per round (simulating ~1 hour):
+- Active creators: 50-100 (10-20% of creator pool)
+- Active contributors: 100-300 (2-7% of contributor pool)
+- Active lurkers: 5-20 (0.01-0.04% of lurker pool)
+- **Total active per round: ~155-420 agents**
+- This means ~0.3-0.8% of agents are active per round
+
+With LLM calls only for the active agents, this is manageable: 155-420 LLM calls per round.
+At ~$0.001 per call (GPT-4o-mini), that's $0.15-0.42 per round, $7.50-$21.00 for a 50-round simulation.
+
+---
+
+### 7. Recommended Willingness Score Architecture for Swaarm
+
+**Composite Score Formula:**
+```
+activation_probability = sigmoid(
+    w1 * personality_score        # Big Five derived (stable)
+    + w2 * topic_relevance        # Content-persona match (per-post)
+    + w3 * network_exposure       # Feed/graph based (per-round)
+    + w4 * emotional_engagement   # Controversy/sentiment (per-post)
+    + w5 * fatigue_modifier       # Cooldown decay (per-round)
+    + w6 * time_of_day_factor     # Temporal pattern (per-round)
+    + bias                        # Class bias (creator/contributor/lurker)
+)
+```
+
+Where `sigmoid` maps to (0, 1) probability, and bias encodes the 90-9-1 class.
+
+**Alternative (Socialtrait-inspired):**
+```
+base_score = persona_willingness * exp(-lambda * (context_score - persona_willingness))
+activation_prob = base_score * cooldown_factor * time_factor
+active = random() < activation_prob
+```
+
+**Implementation approach:**
+1. All agent features stored as NumPy arrays.
+2. Per-round: vectorized score computation (< 5ms for 50k agents).
+3. Probabilistic selection via random draw against scores.
+4. Only active agents (0.3-0.8%) get LLM calls.
+5. Bounded confidence filter: active agents only engage with content within their opinion range.
+6. Opinion inertia to prevent convergence: `new_opinion = 0.2 * influence + 0.8 * initial`.
+
+### Key Sources
+- Alizadeh & Cioffi-Revilla (2015): "Activation Regimes in Opinion Dynamics" https://www.jasss.org/18/3/8.html
+- Hegselmann & Krause (2002): "Opinion Dynamics and Bounded Confidence" https://www.jasss.org/5/3/2.html
+- Granovetter (1978): "Threshold Models of Collective Behavior" https://sociology.stanford.edu/publications/threshold-models-collective-behavior
+- Socialtrait Patent US12412128B1: https://patents.google.com/patent/US12412128B1
+- Springer (2025): "Selective agreement, not sycophancy" https://link.springer.com/article/10.1140/epjds/s13688-025-00579-1
+- JASSS submission (2025): "Integrating LLM in Agent-Based Social Simulation" https://arxiv.org/html/2507.19364v1
+- Nielsen Norman Group: "Participation Inequality" https://www.nngroup.com/articles/participation-inequality/
+- Pew Research (2025): "Americans Social Media Use" https://www.pewresearch.org/internet/2025/11/20/americans-social-media-use-2025/
+- David Sayce: "How Many Posts on X" https://www.dsayce.com/digital-marketing/tweets-day/
+- LDG: "Faster ABMs in Python" https://lrdegeest.github.io/blog/faster-abms-python
+
+---
+
+## Agent Memory, Prompting & Architecture Research (2026-04-05)
+
+### 1. Agent Memory Systems
+
+**Stanford Generative Agents Architecture (Park et al., 2023)**
+
+The gold-standard architecture has three components: Memory Stream, Reflection, and Planning.
+
+**Memory Stream Storage:**
+Each memory object stores:
+- Natural language description of the event
+- Creation timestamp
+- Most recent access timestamp
+- Importance score (1-10, rated by LLM at creation time)
+
+**Retrieval Function (three-factor scoring):**
+```
+score = alpha_recency * recency + alpha_importance * importance + alpha_relevance * relevance
+```
+- **Recency**: Exponential decay with factor 0.995 per game-hour since last access
+- **Importance**: LLM-rated 1-10 scale (1 = brushing teeth, 10 = breakup/college acceptance)
+- **Relevance**: Cosine similarity between memory embedding and query embedding
+- All alpha weights = 1.0, scores normalized to [0,1] via min-max scaling
+- Top-ranked memories fitting the context window are included in prompts
+
+**Reflection Mechanism:**
+- Trigger: When cumulative importance score of recent events exceeds threshold (150 in original implementation)
+- Occurs ~2-3 times per simulated day
+- Process: (1) Feed 100 most recent memories to LLM, ask for 3 salient high-level questions, (2) use questions as retrieval queries, (3) extract insights with evidence citations
+- Reflections form hierarchical trees (observations -> reflections -> meta-reflections)
+
+**Planning:**
+- Daily plan: 5-8 broad chunks generated from agent summary + previous day
+- Recursive decomposition: hour chunks -> 5-15 minute actions
+- At each timestep: evaluate observations, decide to continue plan or react
+
+**Practical Recommendation for Swaarm (token-constrained, ~500 tokens/agent):**
+
+The full Stanford architecture is too expensive for 100-500 agents. Simplified approach:
+
+```python
+# Simplified memory for Swaarm agents
+class AgentMemory(BaseModel):
+    """Lightweight memory optimized for social media simulation."""
+    # Static persona (in system prompt, cached)
+    persona_summary: str          # ~100 tokens
+
+    # Rolling summary (compressed periodically)
+    experience_summary: str       # ~80 tokens, updated every 5 rounds
+
+    # Recent observations (sliding window)
+    recent_memories: list[str]    # Last 3-5 events, ~100 tokens
+
+    # Strong opinions formed (importance >= 7)
+    strong_opinions: list[str]    # Max 3-5 items, ~50 tokens
+
+    # Current plan/intention
+    current_plan: str             # ~20 tokens
+```
+
+**Token Budget Allocation (~500 tokens input):**
+- System prompt (persona): ~150 tokens (STATIC, cacheable)
+- Memory context: ~100 tokens (experience summary + strong opinions)
+- Feed content: ~200 tokens (3-5 posts the agent "sees")
+- Action instructions: ~50 tokens (what actions are available)
+
+**Memory Strategy: Hybrid approach**
+- Sliding window for last 3-5 observations (cheap, always recent)
+- Importance-based retention: keep high-importance memories permanently
+- Summary-based compression: every N rounds, compress recent history into a paragraph
+- Skip embeddings initially (expensive); use importance score + recency only
+
+### 2. Prompt Engineering for Consistent Personas
+
+**Key Research Finding:** Increasing persona detail yields power-law improvement in alignment with human trait distributions, with diminishing returns as detail increases.
+
+**System Prompt Structure for Agent Personas:**
+
+```python
+AGENT_SYSTEM_PROMPT = """Du bist {name}, {age} Jahre alt, {occupation} aus {location}.
+
+## Persoenlichkeit
+- Grundhaltung: {disposition} (z.B. skeptisch, begeisterungsfaehig, pragmatisch)
+- Kommunikationsstil: {style} (z.B. emotional, sachlich, provokativ, humorvoll)
+- Politische Tendenz: {political_leaning}
+- Medienkonsum: {media_habits}
+- Expertise: {expertise_areas}
+
+## Meinungen
+{strong_opinions_list}
+
+## Posting-Verhalten
+- Typische Postlaenge: {typical_length} (kurz/mittel/lang)
+- Nutzt Emojis: {uses_emojis} (ja/nein/manchmal)
+- Reagiert auf: {triggers} (z.B. Ungerechtigkeit, Innovationen, Kontroversen)
+- Ignoriert: {ignores} (z.B. Werbung, irrelevante Themen)
+
+## Wichtig
+- Bleib IMMER in der Rolle von {name}
+- Antworte NUR auf Deutsch
+- Deine Antworten spiegeln deine Persoenlichkeit und Meinungen wider
+"""
+```
+
+**Trait Descriptions vs. Few-Shot Examples:**
+- Trait descriptions are more token-efficient and work well for GPT-4o-mini
+- Few-shot examples improve consistency for specific behaviors (e.g., posting style) but cost more tokens
+- Best approach: Use trait descriptions in system prompt + 1-2 very short few-shot examples in the first user message for critical behaviors
+- Personas are fragile for extreme styles (very sarcastic, very formal); anchor with explicit constraints
+
+**Anchoring Techniques for Consistency:**
+1. Include explicit constraints ("Du sagst NIEMALS..." / "Du verwendest IMMER...")
+2. Define what the persona does NOT do
+3. Place persona at the start of system prompt (benefits from caching)
+4. Use structured sections (Markdown headers) for clarity
+5. Restate key personality trait in the action prompt as a reminder
+
+### 3. Structured Output for Agent Actions
+
+**Recommendation: Use Function Calling with strict: true**
+
+This is the most reliable approach for action selection. Structured Outputs guarantees schema adherence when strict mode is enabled.
+
+```python
+from pydantic import BaseModel
+from enum import Enum
+from typing import Optional
+
+class ActionType(str, Enum):
+    POST = "post"
+    REPLY = "reply"
+    LIKE = "like"
+    SHARE = "share"
+    SKIP = "skip"
+
+class Sentiment(str, Enum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+    MIXED = "mixed"
+
+class AgentAction(BaseModel):
+    """Schema for agent action output via Structured Outputs."""
+    reasoning: str          # Brief internal reasoning (useful for analysis)
+    action: ActionType
+    target_post_id: Optional[str] = None  # Which post to react to
+    content: Optional[str] = None         # Text for post/reply
+    sentiment: Sentiment
+    emotional_intensity: int  # 1-5 scale
+
+# Function definition for OpenAI API
+AGENT_ACTION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "take_action",
+        "description": "Choose and execute a social media action",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": "Brief reasoning for this action (1-2 sentences)"
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["post", "reply", "like", "share", "skip"]
+                },
+                "target_post_id": {
+                    "type": ["string", "null"],
+                    "description": "ID of post to react to, null for new posts or skip"
+                },
+                "content": {
+                    "type": ["string", "null"],
+                    "description": "Text content for post or reply, null for like/share/skip"
+                },
+                "sentiment": {
+                    "type": "string",
+                    "enum": ["positive", "negative", "neutral", "mixed"]
+                },
+                "emotional_intensity": {
+                    "type": "integer",
+                    "description": "1=calm, 5=very emotional"
+                }
+            },
+            "required": ["reasoning", "action", "target_post_id",
+                         "content", "sentiment", "emotional_intensity"],
+            "additionalProperties": False
+        }
+    }
+}
+```
+
+**Key Implementation Notes:**
+- strict: true guarantees valid JSON matching the schema (no validation/retry needed)
+- All fields must be required when using strict mode; use nullable types for optional fields
+- Pydantic integration: use `client.chat.completions.parse(response_format=AgentAction)` for direct deserialization
+- Handle refusals programmatically (check response.refusal field)
+- GPT-4o-mini supports structured outputs natively
+- Keep tool count low (6-15 per platform, well within 128 tool limit)
+
+**Error Handling Strategy:**
+```python
+async def get_agent_action(response) -> AgentAction:
+    if response.choices[0].message.refusal:
+        # Model refused (safety filter) -> default to skip
+        return AgentAction(
+            reasoning="Refused by model",
+            action=ActionType.SKIP,
+            target_post_id=None,
+            content=None,
+            sentiment=Sentiment.NEUTRAL,
+            emotional_intensity=1
+        )
+    # With strict mode, parsing is guaranteed to succeed
+    return AgentAction.model_validate_json(
+        response.choices[0].message.tool_calls[0].function.arguments
+    )
+```
+
+### 4. Feed Representation in Prompts
+
+**Key Finding:** JSON is token-inefficient (40-70% overhead). Use compact text formats.
+
+**Recommended Feed Format (compact, ~40 tokens per post):**
+
+```
+## Dein Feed
+
+[P1] @MaxMueller (Journalist, 12.4K Follower) - vor 2h
+"Die neue Klimastrategie der Firma X ist reine Greenwashing-PR"
++47 c23 s12
+
+[P2] @SarahTech (Ingenieurin, 890 Follower) - vor 1h
+"Interessanter Ansatz, aber die Zahlen stimmen nicht. Thread:"
++12 c5 s3
+Antwort auf [P1]
+
+[P3] ORIGINAL-POST (Firma X, 50K Follower) - vor 3h
+"Wir verpflichten uns zu 100% erneuerbarer Energie bis 2030"
++234 c89 s45
+```
+
+**Format Design Principles:**
+- Use short IDs [P1], [P2] for reference in actions
+- Include social proof signals (followers, engagement) compactly
+- Show relationship (reply chains) explicitly
+- Timestamps as relative ("vor 2h") not absolute
+- Skip unnecessary metadata (profile pictures, verified badges)
+- 3-5 posts per round is optimal (balances context vs. cost)
+
+**How Many Posts Per Round:**
+- 3-5 posts is the sweet spot for 500-token budget
+- Show the original stimulus post + 2-4 most relevant reactions
+- Prioritize: (1) posts from the agent's social connections, (2) high-engagement posts, (3) recent posts
+- Rotate which posts different agents see (simulates algorithmic feeds)
+
+**Alternative: Ultra-Compact Format (~25 tokens per post):**
+```
+P1|@Max|Journalist|12K|2h|"Greenwashing-PR"|+47/c23/s12
+P2|@Sarah|Ingenieurin|890|1h|"Zahlen stimmen nicht"|+12/c5/s3|re:P1
+```
+This saves ~40% tokens but may reduce LLM comprehension. Test both.
+
+### 5. Preventing Mode Collapse
+
+**The Problem:** Post-RLHF models exhibit mode collapse (favoring narrow, typical responses). In multi-agent simulation, this causes all agents to sound similar despite different personas.
+
+**Strategy 1: Temperature Differentiation (Simple)**
+```python
+# Per-agent temperature based on personality
+def get_agent_temperature(persona: AgentPersona) -> float:
+    base = 0.7  # Default
+    if persona.disposition == "provocative":
+        return min(base + 0.3, 1.2)  # More varied
+    if persona.disposition == "analytical":
+        return max(base - 0.2, 0.4)  # More consistent
+    return base
+
+# WARNING: High temperature (>1.0) causes reasoning drift
+# in multi-step agent loops. Use cautiously.
+```
+
+**Strategy 2: Verbalized Sampling (Research-Backed)**
+
+Verbalized Sampling (VS) prompts the model to generate multiple responses with probability estimates, then samples from that distribution. Achieves 1.6-2.1x diversity improvement over direct prompting without quality loss.
+
+```python
+# Instead of: "How would you react to this post?"
+# Use: "Generate 3 possible reactions with probabilities:"
+
+VS_PROMPT_SUFFIX = """
+Generiere 3 moegliche Reaktionen auf diesen Post.
+Fuer jede Reaktion, gib eine Wahrscheinlichkeit an (summiert zu 1.0):
+
+Reaktion 1 (p=?): ...
+Reaktion 2 (p=?): ...
+Reaktion 3 (p=?): ...
+"""
+# Then sample from the distribution programmatically
+```
+
+Note: VS costs ~3x more tokens per decision but is orthogonal to temperature. Consider using it selectively (e.g., only for "opinion leader" agents or for the initial seeding round).
+
+**Strategy 3: Structural Diversity Mechanisms**
+- Assign explicit contrarian roles: "Du bist IMMER skeptisch gegenueber Unternehmensmeldungen"
+- Vary information access: different agents see different subsets of posts
+- Include opinion anchors in persona: "Du findest Greenwashing inakzeptabel" vs. "Du unterstuetzt Klimainitiativen der Wirtschaft"
+- Use different system prompt styles per agent cluster (formal vs. casual)
+- Add randomized context: "Heute hattest du einen schlechten Tag" / "Du hast gerade gute Nachrichten bekommen"
+
+**Strategy 4: Population-Level Calibration**
+- Pre-define opinion distribution for the population (e.g., 30% supportive, 40% neutral, 30% critical)
+- Assign stances explicitly in persona, not left to LLM inference
+- Monitor and adjust: if output distribution drifts, adjust persona prompts
+- Use willingness scoring to filter which agents even engage (not everyone reacts)
+
+### 6. Token Optimization & Prompt Caching
+
+**OpenAI Prompt Caching (Automatic since Oct 2024):**
+- Minimum prefix: 1,024 tokens
+- Cache increments: 128 tokens
+- Duration: 5-10 minutes standard, up to 24 hours with extended retention
+- Cost savings: 50% on GPT-4o-mini cached tokens, 75% on GPT-4.1
+- Latency reduction: up to 80% for cached prefixes
+
+**Prompt Structure for Maximum Cache Hits:**
+
+```
+[STATIC PREFIX - cacheable]                    ~1,100+ tokens
+  System prompt with persona definition         ~150 tokens
+  Platform rules and constraints                ~100 tokens
+  Action schema / tool definitions              ~400 tokens
+  General instructions                          ~200 tokens
+  Padding/examples to reach 1,024 minimum       ~150 tokens
+
+[DYNAMIC SUFFIX - not cached]                  ~400 tokens
+  Current memory context                        ~100 tokens
+  Feed content for this round                   ~200 tokens
+  Round number and time context                 ~20 tokens
+  Action prompt                                 ~80 tokens
+```
+
+**Critical Implementation Tips:**
+1. Pad static prefix to exceed 1,024 tokens (include few-shot examples or detailed platform rules)
+2. Keep tool definitions stable (schema changes invalidate cache)
+3. Use `prompt_cache_key` parameter to improve routing (60% -> 87% hit rate in documented case)
+4. Batch similar agents together (same persona type = same prefix = better caching)
+5. Group agents by persona archetype so system prompts overlap more
+6. Use Responses API instead of Chat Completions (40-80% better cache utilization)
+
+**Cacheable vs. Dynamic Breakdown:**
+
+| Component | Static? | Cacheable? | Tokens |
+|-----------|---------|------------|--------|
+| Persona definition | Yes | Yes | ~150 |
+| Platform rules | Yes | Yes | ~100 |
+| Tool schema | Yes | Yes | ~400 |
+| Instructions | Yes | Yes | ~200 |
+| Memory summary | Semi (updates every 5 rounds) | Partial | ~100 |
+| Feed content | No (changes every round) | No | ~200 |
+| Round context | No | No | ~20 |
+
+**Cost Estimation (500 agents, 50 rounds, GPT-4o-mini):**
+- Per call: ~1,500 input tokens + ~100 output tokens
+- Total calls: 500 * 50 = 25,000
+- Without caching: 25,000 * 1,500 = 37.5M input tokens
+- With caching (~70% hit rate on ~1,100 token prefix):
+  - Cached: 25,000 * 1,100 * 0.7 = 19.25M tokens at 50% discount
+  - Uncached: 25,000 * 1,100 * 0.3 + 25,000 * 400 = 18.25M tokens full price
+  - Savings: ~30-35% on input tokens
+- GPT-4o-mini pricing: $0.15/1M input, $0.075/1M cached input
+- Estimated cost per simulation: ~$4-6 (down from ~$5.60 without caching)
+
+**Further Optimization: Agent Archetype Batching**
+
+Instead of 500 unique personas, define 20-30 archetype templates. Agents within the same archetype share the same system prompt prefix, dramatically improving cache hit rates:
+
+```python
+ARCHETYPES = {
+    "skeptischer_journalist": {
+        "system_prompt": "...",  # Shared across all agents of this type
+        "variable_fields": ["name", "age", "specific_opinions"]
+    },
+    "technik_enthusiast": { ... },
+    "besorgter_buerger": { ... },
+    # ... 20-30 archetypes
+}
+# Variable fields injected AFTER the cached prefix
+```
+
+### Key Sources
+- Stanford Generative Agents: https://dl.acm.org/doi/10.1145/3586183.3606763
+- Verbalized Sampling: https://arxiv.org/html/2510.01171v1
+- OpenAI Structured Outputs: https://developers.openai.com/api/docs/guides/structured-outputs
+- OpenAI Prompt Caching 201: https://developers.openai.com/cookbook/examples/prompt_caching_201
+- GPT-4.1 Prompting Guide: https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide
+- OpenAI Persona Prompting: https://developers.openai.com/cookbook/examples/gpt-5/prompt_personalities
+- LLM Persona Simulation: https://www.emergentmind.com/topics/llm-based-persona-simulation
+- Multi-Agent Prompt Engineering: https://www.emergentmind.com/topics/multi-agent-prompt-engineering
+- Temperature and Agent Failure: https://machinelearningmastery.com/why-agents-fail-the-role-of-seed-values-and-temperature-in-agentic-loops/
+
+---
+
+## Open-Source Social Simulation Landscape (Recherche 2026-04-05)
+
+### 1. MiroFish (github.com/666ghj/MiroFish)
+
+**Overview:** Open-source "swarm intelligence prediction engine" that went viral in March 2026 (49k+ GitHub stars). Built by a Chinese undergraduate, funded by Shanda Group. AGPL-3.0 licensed. Uses OASIS under the hood. Very close to what Swaarm is building.
+
+**Tech Stack:** Python 3.11-3.12 backend, Vue.js frontend, OASIS simulation engine, Zep Cloud for agent memory, GraphRAG for knowledge extraction, uv package manager.
+
+**5-Stage Pipeline:**
+1. **Graph Construction** -- GraphRAG parses seed document (press release, news article), extracts entities and relationships, builds a knowledge graph. This is the key differentiator vs. raw OASIS.
+2. **Environment & Agent Setup** -- Personas auto-generated from knowledge graph. Each agent gets: unique personality, stance on topic, long-term memory (Zep Cloud), behavioral logic. Agent beliefs initialized from graph relations, relationships from graph edges. High-centrality nodes become opinion leaders.
+3. **Dual-Platform Simulation** -- Runs OASIS on two platforms simultaneously (Twitter-like + Reddit-like). OASIS handles the 23 social actions. Simulation runs as subprocess via `simulation_runner.py`.
+4. **Report Generation** -- ReportAgent (ReACT agent with tool-calling) analyzes simulation results. Has full toolset access to post-simulation environment. Produces structured prediction report.
+5. **Deep Interaction** -- Users can chat with any agent post-simulation to understand reasoning, or inject new variables for scenario testing.
+
+**Backend Architecture (13 services):**
+- `graph_builder.py` -- Ontology-to-graph pipeline
+- `ontology_generator.py` -- Creates ontology definitions from seed material
+- `oasis_profile_generator.py` -- Generates OASIS-compatible agent profiles
+- `simulation_config_generator.py` -- Creates simulation configurations
+- `simulation_runner.py` -- Runs OASIS as subprocess
+- `simulation_manager.py` -- Orchestrates simulation lifecycle
+- `simulation_ipc.py` -- Inter-process communication with OASIS
+- `report_agent.py` -- ReACT agent for report generation
+- `text_processor.py` -- Text processing utilities
+- `zep_entity_reader.py` -- Reads entities from Zep
+- `zep_graph_memory_updater.py` -- Updates graph memory
+- `zep_tools.py` -- Zep utility functions
+- `config.py` -- Configuration
+
+**Key Architectural Decisions:**
+- OASIS runs as a **subprocess**, not in-process. Communication via IPC (`simulation_ipc.py`). This keeps the simulation engine isolated.
+- **Zep Cloud** for long-term agent memory -- agents remember across interactions. This is expensive at scale but powerful.
+- **GraphRAG** as the knowledge foundation means agents are grounded in the actual content, not just random personas.
+- Provider-agnostic LLM layer (OpenAI SDK format, works with Qwen, OpenAI, etc.)
+- Docker Compose for deployment (ports 3000 frontend, 5001 backend)
+- Memory grows rapidly: 16GB RAM needed for >40 rounds. MAX_CONCURRENT_AGENTS=10 for throttling.
+
+**Limitations (relevant for Swaarm):**
+- Agents show heightened susceptibility to herd behavior vs. real humans
+- Outputs are "plausible scenarios, not probability estimates"
+- Heavy memory footprint at scale
+- Zep Cloud dependency (single point of failure, cost)
+
+### 2. MiroFish-Offline (github.com/nikmcfly/MiroFish-Offline)
+
+English-language fork replacing cloud dependencies with local services:
+- **Neo4j** replaces Zep Cloud for graph memory
+- **Ollama** replaces cloud LLMs
+- **nomic-embed-text** for local embeddings
+- Introduces `GraphStorage` **abstract interface** -- swap Neo4j for any graph DB by implementing one class. Good pattern.
+- Hybrid search: 70% vector similarity + 30% BM25 keyword matching
+- Dependency injection via Flask's `app.extensions` dict (no global singletons)
+- Requires 32GB RAM recommended for larger models
+
+### 3. OASIS (github.com/camel-ai/oasis) -- The Simulation Engine
+
+**Architecture (4 core modules):**
+1. **Environment Server** -- Centralized platform simulation. SQLite3 database with tables for users, posts, comments, likes, dislikes, follows, traces. Action-dispatch pattern via `getattr(self, action.value, None)`.
+2. **Recommendation System** -- Two algorithms: interest-based (TwHIN-BERT embeddings) and hot-score-based (Reddit's disclosed ranking formula: `h = log10(max(|u-d|,1)) + sign(u-d)*(t-t0)/45000`).
+3. **Time Engine** -- Agents activated probabilistically using 24-dimensional hourly activity vector. 3-minute time steps. Linear time-mapping for simulation acceleration.
+4. **Agent Module** -- LLM-powered with memory module + action module.
+
+**Agent Design:**
+- `SocialAgent` extends `ChatAgent` from CAMEL-AI framework
+- Key methods: `perform_action_by_llm()` (autonomous), `perform_action_by_hci()` (manual), `perform_action_by_data()` (scripted)
+- Decision loop: Environment observation -> text prompt -> LLM reasoning (Chain-of-Thought) -> tool/function selection -> execution
+- 23 actions exposed as `FunctionTool` objects via OpenAI function-calling
+- Memory: inherits CAMEL memory system, stores conversation history in OpenAI message format
+
+**Platform Abstraction:**
+- Single `Platform` class handles all social media operations
+- Async message-driven with channel-based communication
+- Methods for content (create_post, repost, quote_post), engagement (like, dislike, comment), network (follow, unfollow, mute), discovery (search, trend), moderation (report), groups (create_group, join_group)
+- Standardized response contracts: all methods return success/failure dicts with relevant IDs
+- Pluggable recommendation system (Reddit, Twitter, TWHIN, Random)
+
+**Scalability:**
+- Up to 1M agents (18 hours per time step with 27 A100 GPUs at that scale)
+- Distributed architecture: agents, environment server, inference as independent modules
+- vLLM for efficient inference at scale
+- ~48,500 new posts per step at 1M agent scale
+
+**User Generation Algorithm:**
+- Combines real user data with relationship networks
+- Core users connect to ordinary users via interest-based sampling
+- 0.2 probability of following core users
+- Maintains scale-free network properties
+
+**Code Pattern (basic simulation):**
+```python
+env = oasis.make(
+    agent_graph=agent_graph,
+    platform=oasis.DefaultPlatformType.REDDIT,
+    database_path="./data/simulation.db"
+)
+await env.reset()
+# Manual actions
+await env.step({agent: ManualAction(action_type=..., content=...)})
+# LLM-driven actions
+await env.step({agent: LLMAction() for agent in agents})
+await env.close()
+```
+
+### 4. mastodon-sim (github.com/social-sandbox/mastodon-sim)
+
+**Unique approach:** Runs simulations on an actual Mastodon server instance, not a simulated platform.
+
+**Architecture:**
+- Built on Google DeepMind's **Concordia** framework
+- Fully YAML-configurable (no code changes needed for new simulations)
+- 4 YAML files: `soc_sys.yaml` (shared knowledge), `agents.yaml` (personas), `probes.yaml` (surveys), `sim.yaml` (runtime params)
+- Hydra configuration management
+- Supports base agents and custom agents (voter.py, candidate.py, malicious.py)
+- Dual output: `events.json` (agent actions) + `prompts_and_responses.jsonl` (LLM traces)
+- **Probe system** as first-class feature: deploy longitudinal surveys on agent population during simulation
+- Exogenous "gamemaster" agents for injecting controlled events
+- NeurIPS 2024 Workshop paper
+
+**Key Insight for Swaarm:** The YAML-configurable approach and probe system are interesting patterns. Being able to define entire simulations declaratively could be valuable for our SaaS customers who want to tweak parameters without technical knowledge.
+
+### 5. AgentSociety (github.com/tsinghua-fib-lab/AgentSociety)
+
+**Architecture (6 layers):**
+1. Model Layer -- Agent config and task management
+2. Agent Layer -- Multi-head workflows with memory, reasoning, routing, action blocks
+3. Message Layer -- P2P, peer-to-group, group chat
+4. Environment Layer -- Sensing, interaction, message processing
+5. LLM Layer -- Provider-agnostic (OpenAI, Qwen, Deepseek)
+6. Tool Layer -- String processing, JSON parsing, storage
+
+**Key Pattern:** "Mind-Behavior Coupling" -- LLM reasoning integrated with behavioral theories like Maslow's Hierarchy of Needs. Agents don't just respond to prompts; they have explicit needs and motivations modeled as psychological frameworks.
+
+**Relevant for Swaarm:** The concept of grounding agent behavior in behavioral science theories (not just LLM personality prompts) could produce more realistic simulation outcomes.
+
+### 6. Other Notable Projects
+
+- **AgentVerse** (github.com/OpenBMB/AgentVerse) -- ICLR 2024, general multi-agent deployment framework
+- **GenSim** (NAACL 2025 demo) -- General social simulation platform
+- **SoMe Benchmark** (arxiv 2512.14720) -- Realistic benchmark for LLM social media agents
+
+---
+
+## Architectural Lessons for Swaarm
+
+### What MiroFish Does Well (and We Should Learn From)
+
+1. **GraphRAG as Foundation:** Extracting entities/relationships from the seed document before generating personas means agents are grounded in the actual communication content. Our current approach should incorporate this.
+
+2. **5-Stage Pipeline is Clean:** Graph construction -> Environment setup -> Simulation -> Report -> Deep interaction. We should adopt a similar staged approach.
+
+3. **ReportAgent as ReACT Agent:** Using a tool-calling agent (not a simple summarizer) for report generation means the report can dynamically query the simulation data. Much more powerful.
+
+4. **Subprocess Isolation for OASIS:** Running the simulation engine as a subprocess keeps it isolated from the API server. Good for stability and resource management.
+
+5. **Provider-Agnostic from Day 1:** Their LLM layer uses OpenAI SDK format but works with any compatible provider.
+
+### Where We Can Differentiate
+
+1. **DACH Focus:** German-language UI, European data handling, GDPR compliance -- none of the open-source projects address this.
+
+2. **SaaS-First Architecture:** MiroFish is a self-hosted tool. We're building a multi-tenant SaaS with Stripe billing, Supabase auth, proper user management.
+
+3. **Communication-Specific Optimization:** MiroFish is general-purpose ("predict anything"). We can optimize specifically for corporate communications: press releases, crisis comms, product launches, public statements.
+
+4. **Better Report Quality:** The ReportAgent pattern is good, but we can build communication-specific analytical frameworks (sentiment trajectory, key opinion leader identification, crisis escalation prediction, message resonance scoring).
+
+5. **Custom Simulation Engine vs. OASIS Dependency:** Building our own engine (as currently planned) gives us full control over the simulation loop, action system, and platform abstraction without OASIS's overhead and complexity.
+
+### Specific Technical Patterns to Adopt
+
+1. **Action-as-FunctionTool Pattern (from OASIS):** Expose platform actions as function tools via OpenAI function-calling. Clean, extensible, well-understood by LLMs.
+
+2. **Standardized Response Contracts (from OASIS Platform):** All action methods return `{success: bool, id: str, ...}` dicts. Consistent interface regardless of action type.
+
+3. **Probabilistic Activation (from OASIS Time Engine):** Don't activate all agents every round. Use a 24-dim hourly activity vector to probabilistically activate agents, mimicking real usage patterns.
+
+4. **Hybrid Search for Memory (from MiroFish-Offline):** 70% vector similarity + 30% BM25 for knowledge retrieval. Better than pure vector search.
+
+5. **GraphStorage Abstract Interface (from MiroFish-Offline):** Swap graph backends by implementing one class. Good pattern for our storage layer.
+
+6. **YAML-Configurable Simulations (from mastodon-sim):** Allow customers to configure simulation parameters declaratively.
+
+7. **Probe/Survey System (from mastodon-sim):** Deploy longitudinal surveys on agent population during simulation. Useful for tracking opinion shifts over time.
+
+8. **Mind-Behavior Coupling (from AgentSociety):** Ground agent behavior in behavioral science, not just personality prompts. More realistic outcomes.
+
+### Error Handling & Retry Best Practices (from Research)
+
+- **Exponential backoff with full jitter** for LLM API retries: `wait = random(0, min(cap, base * 2^attempt))`. Prevents thundering herd.
+- **Classify errors:** Client errors (4xx) should not be retried. Server errors (5xx) and rate limits should be retried.
+- **Circuit breaker pattern:** After N consecutive failures, stop retrying and fail fast for a cooldown period.
+- **Fallback models:** If primary LLM fails, fall back to a cheaper/different model.
+- **Checkpoint simulation state:** Save state between rounds so simulation can resume after failure.
+
+### Key Sources
+- MiroFish Main Repo: https://github.com/666ghj/MiroFish
+- MiroFish Offline Fork: https://github.com/nikmcfly/MiroFish-Offline
+- OASIS: https://github.com/camel-ai/oasis
+- OASIS Paper: https://arxiv.org/abs/2411.11581
+- OASIS Docs: https://docs.oasis.camel-ai.org/
+- mastodon-sim: https://github.com/social-sandbox/mastodon-sim
+- AgentSociety: https://github.com/tsinghua-fib-lab/AgentSociety
+- AgentVerse: https://github.com/OpenBMB/AgentVerse
+- MiroFish Guide: https://openclawapi.org/en/blog/2026-03-17-mirofish-guide
+- MiroFish DEV Article: https://dev.to/arshtechpro/mirofish-the-open-source-ai-engine-that-builds-digital-worlds-to-predict-the-future-ki8
+
+## Simulation Quality Assurance & Validation Research (2026-04-05)
+
+### 1. How Competitors Claim Accuracy
+
+**Socialtrait (86% accuracy claim):**
+- Users report simulations match real-world results 86% of the time
+- Claims 95% accuracy on brand crisis benchmarks specifically
+- Methodology: "Representativeness framework" comparing simulation outputs against actual market outcomes
+- Each AI persona defined across 50+ demographic, psychographic, and behavioral variables
+- Uses proprietary persona algorithms, LLMs, and reinforcement learning
+- Self-reported metrics, no independent audit published
+- Source: https://finance.yahoo.com/news/socialtrait-launches-first-ai-powered-123900791.html
+
+**Artificial Societies (95% accuracy claim):**
+- Claims 95% distribution accuracy against "human self-replication"
+- 90% persona internal coherence
+- Each society: 300-5,000 interconnected AI personas from public social media profiles
+- Critical limitation: self-reported, not independently audited
+- Overrepresents digitally active populations, underrepresents offline demographics
+- Source: https://www.ycombinator.com/companies/artificial-societies
+
+**Stanford/Google DeepMind reference benchmark:**
+- Generative agents replicated real participants' responses 85% as accurately as individuals replicated their own answers two weeks later on the General Social Survey
+- Social behavior mimicked with 98% correlation
+- This is the most rigorous independent validation available
+- Source: https://news.stanford.edu/stories/2025/07/ai-social-science-research-simulated-human-subjects
+
+**Industry-wide synthetic audience benchmarks:**
+- 85-92% parity score depending on audience type (Synthetic Users)
+- 80-90% correlation to actual engagement metrics across leading platforms
+- Source: https://research.aimultiple.com/audience-simulation/
+
+**Key takeaway for Swaarm:** Competitors' accuracy claims are marketing numbers. The real bar is the Stanford benchmark (85% self-replication accuracy). We should aim for transparent, reproducible validation rather than inflated claims.
+
+### 2. Validation Methodology Framework
+
+Based on the comprehensive review "Validation is the central challenge for generative social simulation" (PMC, 2025):
+
+**Three critical validation challenges for LLM-based ABMs:**
+1. **Black-box opacity** - impossible to determine why a specific input yields a specific output
+2. **Stochastic behavior and bias** - different outputs for identical inputs; social stereotypes instead of accurate representations
+3. **Hallucination and out-of-distribution** - factually incorrect outputs, especially for unprecedented scenarios
+
+**Five validation approaches currently used (from review of 35 studies):**
+
+| Approach | Usage | Description |
+|----------|-------|-------------|
+| Human/expert judgment | 22/35 studies | Subjective but most common |
+| Comparison against known social patterns | ~50% | Do outputs follow power laws, etc.? |
+| Empirical human data comparison | ~50% | Compare to real social media data |
+| Comparison with prior models | Rare | Benchmark against existing simulations |
+| Internal consistency checks | Rare | Does the model contradict itself? |
+
+**Critical gap identified:** Most studies validate surface-level outputs (linguistic style) rather than underlying mechanisms.
+
+**Recommended "Operational Validity" standard (three requirements):**
+1. **Purpose alignment** - validation targets must match what the model actually addresses
+2. **External grounding** - evidence from human data or pre-registered benchmarks
+3. **Robustness** - results across multiple runs with sensitivity analyses
+
+Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC12627210/
+
+### 3. Concrete Quality Metrics to Implement
+
+#### A. Opinion Diversity (Shannon Entropy)
+
+```python
+import math
+from collections import Counter
+
+def shannon_entropy(sentiments: list[str]) -> float:
+    """Measure opinion diversity. Higher = more diverse.
+
+    For 5 sentiment categories (very_negative, negative, neutral, positive, very_positive):
+    - Maximum entropy: log2(5) = 2.32 (uniform distribution)
+    - Minimum entropy: 0 (all same sentiment)
+    - Healthy simulation: > 1.5 (diverse but not uniform)
+    """
+    counts = Counter(sentiments)
+    total = len(sentiments)
+    entropy = -sum(
+        (count/total) * math.log2(count/total)
+        for count in counts.values()
+        if count > 0
+    )
+    return entropy
+
+def normalized_entropy(sentiments: list[str]) -> float:
+    """Entropy normalized to [0, 1]. Target: 0.5-0.8."""
+    n_categories = len(set(sentiments))
+    if n_categories <= 1:
+        return 0.0
+    max_entropy = math.log2(n_categories)
+    return shannon_entropy(sentiments) / max_entropy
+```
+
+**Thresholds:**
+- < 0.3 normalized: CRITICAL - mode collapse, all agents agree
+- 0.3-0.5: WARNING - low diversity, might be acceptable for consensus topics
+- 0.5-0.8: HEALTHY - realistic opinion spread
+- > 0.9: WARNING - suspiciously uniform distribution (real opinions cluster)
+
+#### B. Engagement Distribution (Power Law Fit)
+
+Real social media engagement follows power law distributions. A few posts get most engagement, most posts get little.
+
+```python
+import numpy as np
+from scipy import stats
+
+def power_law_fit(engagement_counts: list[int]) -> dict:
+    """Test if engagement follows power law distribution.
+
+    Returns fit quality metrics.
+    Real social media: alpha typically 1.5-2.5
+    """
+    data = np.array([x for x in engagement_counts if x > 0])
+    if len(data) < 10:
+        return {"valid": False, "reason": "insufficient data"}
+
+    # Fit power law using MLE
+    log_data = np.log(data)
+    alpha = 1 + len(data) / np.sum(log_data - np.log(min(data)))
+
+    # Gini coefficient as simpler proxy
+    sorted_data = np.sort(data)
+    n = len(sorted_data)
+    gini = (2 * np.sum((np.arange(1, n+1) * sorted_data)) / (n * np.sum(sorted_data))) - (n + 1) / n
+
+    return {
+        "alpha": alpha,
+        "gini": gini,  # Real social media: 0.6-0.8
+        "valid": True
+    }
+```
+
+**Thresholds:**
+- Gini < 0.3: WARNING - engagement too uniform (unrealistic)
+- Gini 0.5-0.8: HEALTHY - realistic engagement inequality
+- Gini > 0.9: WARNING - one post dominates everything (possible but check)
+
+**Reference:** Real social media follows power law across all 8 major platforms studied (Twitter, YouTube, Instagram, TikTok, etc.) with alpha typically 1.5-2.5
+Source: https://ideas.repec.org/p/wai/econwp/22-07.html
+
+#### C. Content Repetition / Lexical Diversity
+
+```python
+from collections import Counter
+
+def content_repetition_score(posts: list[str]) -> dict:
+    """Measure how repetitive content is across agents.
+
+    Uses multiple metrics:
+    - Unique n-gram ratio
+    - Pairwise cosine similarity (needs embeddings)
+    - Type-token ratio
+    """
+    # Simple: unique trigram ratio
+    all_trigrams = []
+    for post in posts:
+        words = post.lower().split()
+        trigrams = [tuple(words[i:i+3]) for i in range(len(words)-2)]
+        all_trigrams.extend(trigrams)
+
+    if not all_trigrams:
+        return {"unique_ratio": 0, "repetitive": True}
+
+    unique_ratio = len(set(all_trigrams)) / len(all_trigrams)
+
+    return {
+        "unique_trigram_ratio": unique_ratio,
+        # < 0.3: CRITICAL repetition
+        # 0.3-0.6: some repetition (check)
+        # > 0.6: healthy diversity
+        "repetitive": unique_ratio < 0.3
+    }
+
+def pairwise_semantic_similarity(posts: list[str], embeddings) -> float:
+    """Mean pairwise cosine similarity of post embeddings.
+
+    Healthy range: 0.2-0.5 (topically related but not identical)
+    > 0.7: agents are saying the same thing
+    < 0.1: agents are talking about unrelated topics
+    """
+    # Use embedding model (e.g., text-embedding-3-small)
+    # Compute mean pairwise cosine similarity
+    pass
+```
+
+#### D. Persona Consistency (Drift Detection)
+
+Based on research from "Measuring and Controlling Persona Drift in Language Model Dialogs":
+
+**Key findings from the research:**
+- LLM agents progressively abandon their assigned personas over multi-turn conversations
+- Agents begin ADOPTING the user's/other agents' personas during longer exchanges
+- Larger models experience GREATER identity drift (counterintuitive)
+- Performance degrades sharply between conversation turns
+
+**Three metrics for persona consistency:**
+1. **Prompt-to-line consistency** - does each post align with the original persona definition?
+2. **Line-to-line consistency** - does the agent contradict itself within a simulation?
+3. **Q&A consistency** - does the agent maintain stable beliefs when probed?
+
+Source: https://arxiv.org/html/2402.10962v1
+
+```python
+def persona_consistency_score(
+    persona_definition: str,
+    agent_posts: list[str],
+    llm_judge
+) -> dict:
+    """Use an LLM judge to evaluate persona consistency.
+
+    For each post, ask: "Does this post align with the following persona?"
+    Track drift over rounds.
+    """
+    scores = []
+    for i, post in enumerate(agent_posts):
+        score = llm_judge.evaluate(
+            prompt=f"""Rate 0-1 how well this post aligns with the persona.
+
+Persona: {persona_definition}
+Post: {post}
+Round: {i+1}
+
+Score (0=completely off-persona, 1=perfectly in-character):""",
+        )
+        scores.append(score)
+
+    return {
+        "mean_consistency": sum(scores) / len(scores),
+        "drift_slope": _calculate_drift(scores),  # Negative = drifting away
+        "min_consistency": min(scores),
+        "rounds_below_threshold": sum(1 for s in scores if s < 0.5),
+    }
+```
+
+**Thresholds:**
+- Mean < 0.5: CRITICAL - persona not maintained
+- Mean 0.5-0.7: WARNING - noticeable drift
+- Mean > 0.7: HEALTHY
+- Drift slope < -0.02 per round: WARNING - progressive degradation
+
+#### E. Network Clustering Coefficient
+
+```python
+import networkx as nx
+
+def network_realism_metrics(G: nx.Graph) -> dict:
+    """Evaluate if the interaction network looks realistic.
+
+    Real social networks have:
+    - Clustering coefficient: 0.1-0.5 (communities exist)
+    - Average path length: 3-6 (small world property)
+    - Degree distribution: power law
+    """
+    return {
+        "clustering_coefficient": nx.average_clustering(G),
+        # Real social networks: 0.1-0.5
+        # < 0.05: too random
+        # > 0.7: too clustered
+
+        "avg_path_length": nx.average_shortest_path_length(G)
+            if nx.is_connected(G) else None,
+        # Real networks: 3-6
+
+        "density": nx.density(G),
+        # Real social networks: 0.001-0.1
+        # > 0.3: unrealistically dense
+
+        "degree_assortativity": nx.degree_assortativity_coefficient(G),
+        # Real social networks: slightly negative to slightly positive
+    }
+```
+
+#### F. Narrative Emergence Detection
+
+```python
+def narrative_emergence_score(
+    posts_by_round: list[list[str]],
+    embedding_model
+) -> dict:
+    """Detect if organic narratives/themes develop over time.
+
+    Healthy simulations develop new themes beyond the initial stimulus.
+    Measure: topic diversity increases in middle rounds, then may converge.
+    """
+    round_topics = []
+    for round_posts in posts_by_round:
+        # Cluster posts by topic using embeddings
+        embeddings = embedding_model.embed(round_posts)
+        # Use simple k-means or DBSCAN
+        n_topics = _count_clusters(embeddings)
+        round_topics.append(n_topics)
+
+    return {
+        "initial_topics": round_topics[0] if round_topics else 0,
+        "peak_topics": max(round_topics) if round_topics else 0,
+        "topic_growth": (max(round_topics) - round_topics[0])
+            if round_topics else 0,
+        "narrative_emerged": max(round_topics) > round_topics[0] + 1
+        # Healthy: topics grow from stimulus, then may converge
+        # Unhealthy: topic count stays flat (no organic discussion)
+    }
+```
+
+### 4. Known Failure Modes and Mitigations
+
+#### Mode Collapse (ALL agents sound the same)
+- **Cause:** RLHF training causes models to favor narrow, typical responses (typicality bias, alpha=0.57 measured)
+- **Detection:** Shannon entropy < 0.3, pairwise similarity > 0.7, unique trigram ratio < 0.3
+- **Mitigation:** Verbalized sampling (1.6-2.1x diversity gain), temperature differentiation, explicit opinion anchors in personas
+- Source: https://arxiv.org/html/2510.01171v1
+
+#### Sycophancy (agents agree too much)
+- **Cause:** LLMs trained to be helpful, leading to excessive validation
+- **Quantified:** LLMs offer emotional validation 76% vs 22% for humans; accept user's framing 90% vs 60% for humans; false negative rate on moral judgments: 44%
+- **Detection:** Agreement rate across agents, sentiment skew toward positive
+- **Mitigation:** Explicit contrarian personas, "challenge the majority view" instructions, social sycophancy-aware prompting
+- Source: https://arxiv.org/html/2505.13995v1 (ELEPHANT framework)
+
+#### Persona Drift (agents lose their personality)
+- **Cause:** Inherent to multi-turn LLM conversations; larger models drift MORE
+- **Detection:** Persona consistency score declining over rounds, drift slope metric
+- **Mitigation:** Re-inject persona definition every N rounds, shorter simulation windows, memory summaries that reinforce persona
+- Source: https://arxiv.org/html/2402.10962v1
+
+#### Unrealistic Engagement Patterns
+- **Cause:** LLM agents tend to all engage at similar rates (uniform distribution)
+- **Detection:** Gini coefficient < 0.3, no power law in engagement
+- **Mitigation:** Willingness scoring (already planned), activity budgets per agent, explicit lurker personas
+
+#### Hallucination / Factual Errors
+- **Cause:** LLMs generate plausible-sounding but incorrect statements
+- **Detection:** Fact-checking against stimulus content, contradiction detection
+- **Mitigation:** Ground agent knowledge explicitly, limit agent "knowledge" to what they could plausibly know
+
+#### Echo Chamber Formation (too fast)
+- **Cause:** Agents reinforcing each other without external information injection
+- **Detection:** Decreasing opinion entropy over rounds, network homophily increasing
+- **Mitigation:** Introduce "news events" or external information at intervals, diverse feed algorithms
+
+### 5. A/B and Retrospective Validation Strategy
+
+#### Retrospective Validation (Most Feasible for MVP)
+
+**Approach:** Simulate past public events and compare to actual social media reactions.
+
+**Steps:**
+1. Select 10-20 well-documented PR events/crises with known outcomes
+2. Input only the original stimulus (press release, statement, etc.)
+3. Run simulation with a representative population
+4. Compare simulation outputs to actual social media data
+
+**Comparison metrics:**
+- Sentiment distribution correlation (Pearson r)
+- Top-N theme overlap (Jaccard similarity)
+- Engagement distribution shape (KL divergence)
+- Timeline of reaction phases (awareness -> discussion -> opinion formation)
+- Presence of key counter-narratives that actually emerged
+
+**Validation dataset candidates:**
+- Major corporate crises (data breaches, product recalls)
+- Controversial advertising campaigns
+- CEO statements during social movements
+- Sustainability pledges / greenwashing accusations
+- Product launches with mixed reception
+
+**Important:** Don't cherry-pick validations. Pre-register the events and metrics before running simulations.
+
+Source: https://www.jasss.org/27/1/11.html
+
+#### Prospective Validation (Phase 2)
+
+**Approach:** Run simulation BEFORE a real event, then compare to actual outcomes.
+
+**Steps:**
+1. Partner with PR agencies doing real campaigns
+2. Run simulation on draft communications before publication
+3. After publication, compare simulation predictions vs actual reaction
+4. Track prediction accuracy over time
+
+**This is the gold standard** but requires customer partnership and patience.
+
+#### Calibration Dataset Strategy
+
+Build a "Golden Dataset" incrementally:
+1. **Scraped historical data:** Public reactions to 50+ corporate communications (Twitter/X, LinkedIn)
+2. **Annotated ground truth:** Sentiment labels, theme tags, engagement metrics
+3. **Simulation outputs:** Store every simulation result with parameters
+4. **Continuous calibration:** Re-run against golden dataset after each engine change
+
+### 6. Production Quality Assurance System
+
+#### Per-Simulation Quality Score
+
+Every simulation should produce an automated quality report:
+
+```python
+from pydantic import BaseModel
+
+class SimulationQualityReport(BaseModel):
+    """Automated quality assessment for each simulation run."""
+
+    # Overall
+    overall_score: float  # 0-1 weighted average
+    passed: bool  # meets minimum thresholds
+    warnings: list[str]
+
+    # Individual metrics
+    opinion_diversity: float  # normalized Shannon entropy
+    engagement_realism: float  # power law fit score
+    content_uniqueness: float  # 1 - repetition score
+    persona_consistency: float  # mean across agents
+    network_realism: float  # clustering coefficient score
+    narrative_emergence: bool  # did new themes develop?
+
+    # Red flags
+    mode_collapse_detected: bool
+    sycophancy_detected: bool
+    persona_drift_detected: bool
+
+    # Detailed breakdowns
+    sentiment_distribution: dict[str, float]
+    engagement_gini: float
+    top_themes: list[str]
+    agent_consistency_scores: dict[str, float]
+
+
+class QualityThresholds(BaseModel):
+    """Minimum thresholds for a valid simulation."""
+
+    min_opinion_diversity: float = 0.4  # normalized entropy
+    min_content_uniqueness: float = 0.3  # unique trigram ratio
+    min_persona_consistency: float = 0.6  # mean score
+    max_pairwise_similarity: float = 0.7  # semantic similarity
+    min_engagement_gini: float = 0.3  # engagement inequality
+    max_engagement_gini: float = 0.95
+    min_active_agents_pct: float = 0.15  # at least 15% of agents should post
+    max_active_agents_pct: float = 0.85  # not everyone should post
+```
+
+#### Quality Gate System
+
+```
+Simulation Complete
+        |
+        v
+[Run Quality Metrics]
+        |
+        v
+  Score >= 0.6? ----No----> [Flag as LOW QUALITY]
+        |                        |
+       Yes                       v
+        |              [Auto-retry with different seed?]
+        v                        |
+  Any CRITICAL? ----Yes--> [Flag + notify team]
+        |
+       No
+        |
+        v
+  [Deliver results to user with quality badge]
+
+Quality Badges:
+- GREEN (>0.8): High confidence results
+- YELLOW (0.6-0.8): Acceptable, some caveats noted
+- RED (<0.6): Low confidence, interpret with caution
+```
+
+#### Monitoring Dashboard Metrics (Aggregate)
+
+Track across all simulations over time:
+- **Mean quality score** per day/week
+- **Failure rate** (simulations below threshold)
+- **Common failure modes** (which metric fails most?)
+- **Quality by topic** (some topics harder to simulate?)
+- **Quality by population size** (100 vs 500 agents)
+- **Drift detection** (is quality degrading over time due to model changes?)
+
+#### Automated Alerts
+
+```python
+ALERT_CONDITIONS = {
+    "mode_collapse_spike": "More than 20% of simulations in last 24h show mode collapse",
+    "persona_drift_increase": "Mean persona consistency dropped >10% from last week",
+    "quality_degradation": "Rolling 7-day mean quality score dropped below 0.7",
+    "model_change_impact": "Quality metrics shifted >15% after LLM provider/model update",
+}
+```
+
+### 7. Realism Indicators: What Makes Simulations Look Real vs Fake
+
+**Indicators of realistic simulated discussions:**
+- Post length follows log-normal distribution (most short, some long)
+- Not everyone responds (lurker majority: 90-9-1 rule)
+- Some agents change their mind; some never do
+- Counter-arguments emerge organically
+- Emotional tone varies (not uniformly rational or uniformly emotional)
+- Some posts are tangential or off-topic
+- Engagement inequality (few viral, many ignored)
+- Reply chains of varying depth (not all single-level)
+- Temporal patterns (early reactions differ from later ones)
+
+**Indicators of fake/unrealistic simulation:**
+- All posts are similar length
+- Every agent participates equally
+- Universal agreement or disagreement
+- Overly polished language (no typos, no informal speech)
+- No tangential or off-topic contributions
+- Flat engagement distribution
+- No narrative development over time
+- All replies are direct (no nested discussions)
+- Sycophantic tone / excessive politeness
+
+**LLM-generated text detection research shows:**
+- Humans perform poorly at identifying LLM-generated social media posts
+- Key tell: LLM text lacks diversity in sentence structure and vocabulary range
+- Synthetic posts collectively lack topic connectivity and realistic interaction patterns even when individual posts appear realistic
+- Source: https://arxiv.org/html/2409.06653v1
+
+### 8. Recommended Implementation Priority
+
+**Phase 1 (MVP - implement now):**
+1. Shannon entropy of sentiment distribution (cheap, fast, catches mode collapse)
+2. Content repetition score (unique trigram ratio - no external dependencies)
+3. Engagement Gini coefficient (simple, validates power law)
+4. Per-simulation quality report (Pydantic model, store in DB)
+5. Quality badge on results (GREEN/YELLOW/RED)
+
+**Phase 2 (Post-launch, with data):**
+6. Persona consistency scoring via LLM judge (expensive but critical)
+7. Retrospective validation against 10 historical events
+8. Network clustering metrics
+9. Pairwise semantic similarity (needs embedding model)
+10. Narrative emergence detection
+
+**Phase 3 (Growth, with customer data):**
+11. Prospective validation with customer partnerships
+12. Golden dataset calibration pipeline
+13. Automated quality monitoring dashboard
+14. A/B testing framework (different engine parameters)
+15. Quality-based auto-retry system
+
+### Key Sources
+- Validation challenges review: https://pmc.ncbi.nlm.nih.gov/articles/PMC12627210/
+- ELEPHANT sycophancy framework: https://arxiv.org/html/2505.13995v1
+- Persona drift measurement: https://arxiv.org/html/2402.10962v1
+- Verbalized sampling for diversity: https://arxiv.org/html/2510.01171v1
+- Power law in social media: https://ideas.repec.org/p/wai/econwp/22-07.html
+- ABM validation methods overview: https://www.jasss.org/27/1/11.html
+- LLM text detection survey: https://direct.mit.edu/coli/article/51/1/275/127462/
+- Human perception of LLM text: https://arxiv.org/html/2409.06653v1
+- Socialtrait: https://www.socialtrait.com/
+- Artificial Societies: https://societies.io/
+- Stanford generative agents validation: https://news.stanford.edu/stories/2025/07/ai-social-science-research-simulated-human-subjects
+- Audience simulation accuracy: https://research.aimultiple.com/audience-simulation/
+- Anthropic agent evals: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+- Shannon entropy for diversity: https://onlinelibrary.wiley.com/doi/10.1155/2017/8715605
+
+## Social Network Graph Generation Research (2026-04-05)
+
+### 1. Real Social Network Properties
+
+#### Degree Distribution (Power Law)
+- Social networks follow power-law degree distributions: P(k) ~ k^(-gamma)
+- Typical gamma for social networks: **2.0 to 3.0**
+- Twitter follower distribution: gamma ~ **2.1 to 2.2** (empirically measured across multiple studies)
+- LinkedIn: less extreme power-law, gamma ~ **2.5 to 3.0** (more uniform due to reciprocal connections)
+- Median Twitter followers: ~1 (extreme skew; most users have very few followers)
+- Key insight: roughly two-thirds of large-scale empirical networks exhibit power-law tail behavior
+
+#### Clustering Coefficient
+- Twitter: **0.14 to 0.75** depending on community subset (overall ~0.30)
+  - ~10^5 times higher than equivalent random networks
+- LinkedIn: higher clustering within professional/industry clusters (~0.3-0.5)
+- Real social networks: typically **0.1 to 0.5**, much higher than random graphs
+- Clustering coefficient decreases as node degree increases (also follows power law)
+
+#### Average Path Length
+- Twitter: ~**4.1 to 7.3** (varies by study and subgraph)
+- Flickr: ~5.67
+- General social networks: **4 to 7** ("six degrees of separation")
+- Small-world property: avg path length scales as O(log N)
+
+#### Community Structure
+- Real networks have strong modular/community structure
+- Community sizes also follow power law distribution
+- For N=10,000 nodes: typically 10-50 meaningful communities
+- For N=50,000 nodes: typically 50-200 communities
+- Community size exponent (tau2): typically 1.0 to 2.0
+
+### 2. Graph Generation Algorithms Comparison
+
+#### Barabasi-Albert (Preferential Attachment)
+- Produces: power-law degree distribution
+- Missing: no community structure, low clustering coefficient
+- NetworkX: `nx.barabasi_albert_graph(n, m)`
+- Fast generation, simple parameters
+- Good for: quick prototype, influencer hub structure
+- Bad for: realistic community structure
+
+#### Watts-Strogatz (Small World)
+- Produces: high clustering, short path lengths
+- Missing: no power-law degree distribution, no community structure
+- NetworkX: `nx.watts_strogatz_graph(n, k, p)`
+- Good for: modeling clustering and small-world properties
+- Bad for: realistic degree distribution
+
+#### Stochastic Block Model (SBM)
+- Produces: explicit community structure with tunable inter/intra-community edge probabilities
+- Missing: no power-law degree distribution (uniform within blocks)
+- NetworkX: `nx.stochastic_block_model(sizes, probs)`
+- Good for: testing community-dependent behavior
+- Bad for: realistic degree heterogeneity
+
+#### LFR Benchmark (RECOMMENDED for Swaarm)
+- Produces: power-law degree distribution AND community structure simultaneously
+- Parameters: tau1 (degree exponent), tau2 (community size exponent), mu (mixing parameter)
+- NetworkX: `nx.generators.community.LFR_benchmark_graph(n, tau1, tau2, mu, ...)`
+- Each node gets a 'community' attribute automatically
+- Best match for realistic social network simulation
+- Limitation: undirected only in networkx; parameter tuning can be finicky
+
+### 3. Recommended Approach for Swaarm
+
+#### Primary: LFR Benchmark Graph
+
+```python
+import networkx as nx
+from networkx.generators.community import LFR_benchmark_graph
+
+def generate_social_graph(
+    n: int,
+    platform: str = "public",  # "public" (Twitter-like) or "professional" (LinkedIn-like)
+    seed: int | None = None,
+) -> nx.Graph:
+    """Generate a realistic social network graph with community structure."""
+
+    if platform == "public":
+        # Twitter-like: steeper power law, more hubs, lower mixing
+        tau1 = 2.1    # degree distribution exponent (Twitter empirical)
+        tau2 = 1.5    # community size distribution exponent
+        mu = 0.15     # 15% inter-community edges (tight communities)
+        avg_degree = 8
+        min_community = max(20, n // 100)
+        max_community = max(200, n // 10)
+    else:
+        # LinkedIn-like: gentler power law, more clustering, higher mixing
+        tau1 = 2.7    # less extreme degree distribution
+        tau2 = 1.8    # more uniform community sizes
+        mu = 0.25     # 25% inter-community edges (more cross-industry)
+        avg_degree = 12
+        min_community = max(30, n // 80)
+        max_community = max(300, n // 8)
+
+    G = LFR_benchmark_graph(
+        n=n,
+        tau1=tau1,
+        tau2=tau2,
+        mu=mu,
+        average_degree=avg_degree,
+        min_community=min_community,
+        max_community=max_community,
+        seed=seed,
+    )
+
+    return G
+```
+
+#### Post-Processing: Add Influencer Hubs and Bridge Nodes
+
+```python
+def add_influencer_hubs(G: nx.Graph, n_influencers: int = 5, extra_edges: int = 50) -> None:
+    """Boost top-degree nodes to create realistic influencer hubs that bridge communities."""
+    communities = {frozenset(G.nodes[v]["community"]) for v in G}
+    community_list = list(communities)
+
+    # Find top-degree nodes (natural hubs from preferential attachment)
+    top_nodes = sorted(G.nodes(), key=lambda x: G.degree(x), reverse=True)[:n_influencers]
+
+    for hub in top_nodes:
+        # Connect hub to random nodes in OTHER communities
+        hub_community = G.nodes[hub]["community"]
+        other_communities = [c for c in community_list if c != hub_community]
+
+        for _ in range(extra_edges):
+            target_community = random.choice(other_communities)
+            target_node = random.choice(list(target_community))
+            if not G.has_edge(hub, target_node):
+                G.add_edge(hub, target_node)
+
+
+def add_weak_ties(G: nx.Graph, fraction: float = 0.02) -> None:
+    """Add Granovetter-style weak ties (bridges) between communities."""
+    communities = {frozenset(G.nodes[v]["community"]) for v in G}
+    community_list = list(communities)
+    n_bridges = int(G.number_of_edges() * fraction)
+
+    for _ in range(n_bridges):
+        c1, c2 = random.sample(community_list, 2)
+        n1 = random.choice(list(c1))
+        n2 = random.choice(list(c2))
+        if not G.has_edge(n1, n2):
+            G.add_edge(n1, n2)
+```
+
+#### For Directed Graphs (Twitter-like follow relationships)
+
+```python
+def to_directed_social_graph(G: nx.Graph) -> nx.DiGraph:
+    """Convert undirected LFR graph to directed (follow) graph.
+
+    Strategy: each undirected edge becomes one or two directed edges.
+    Higher-degree nodes are more likely to be followed (not following back).
+    """
+    DG = nx.DiGraph()
+    DG.add_nodes_from(G.nodes(data=True))
+
+    max_degree = max(dict(G.degree()).values())
+
+    for u, v in G.edges():
+        deg_u = G.degree(u)
+        deg_v = G.degree(v)
+
+        # Higher degree node is less likely to follow back
+        # P(u follows v) proportional to v's degree
+        p_u_follows_v = deg_v / max_degree
+        p_v_follows_u = deg_u / max_degree
+
+        if random.random() < p_u_follows_v:
+            DG.add_edge(u, v)  # u follows v
+        if random.random() < p_v_follows_u:
+            DG.add_edge(v, u)  # v follows u
+
+        # Ensure at least one direction exists
+        if not DG.has_edge(u, v) and not DG.has_edge(v, u):
+            if deg_v > deg_u:
+                DG.add_edge(u, v)
+            else:
+                DG.add_edge(v, u)
+
+    return DG
+```
+
+### 4. Platform Parameterization Differences
+
+| Property | Public Network (Twitter-like) | Professional Network (LinkedIn-like) |
+|---|---|---|
+| Edge type | Directed (follow) | Undirected (connection) |
+| Power-law exponent (tau1) | 2.1 | 2.7 |
+| Average degree | 5-10 | 10-20 |
+| Clustering coefficient | 0.15-0.30 | 0.30-0.50 |
+| Mixing parameter (mu) | 0.10-0.20 | 0.20-0.35 |
+| Community basis | Interest/topic | Industry/company |
+| Influencer hubs | Extreme (10k+ followers) | Moderate (500-2000 connections) |
+| Reciprocity | Low (~20%) | High (~90%) |
+
+### 5. Scaling and Performance
+
+#### NetworkX (pure Python)
+- 1,000 nodes: <1 second (LFR generation)
+- 10,000 nodes: ~5-30 seconds (LFR, depends on parameters)
+- 50,000 nodes: ~2-15 minutes (LFR, can be slow/fail with tight parameters)
+- Memory: ~50-200 MB for 50K node graph with attributes
+- NetworkX stores graphs as dicts-of-dicts, high memory overhead per edge
+
+#### igraph (C-based, Python wrapper)
+- 10-100x faster than networkx for graph algorithms (PageRank, shortest path, etc.)
+- Does NOT have a built-in LFR generator (would need external C LFR binary)
+- Better for: running analysis after generation
+- Memory: significantly more compact than networkx
+
+#### Recommended Strategy for Swaarm
+1. Use **networkx LFR_benchmark_graph** for generation (convenience, built-in community labels)
+2. For N <= 10,000: networkx is fine for everything (generation + simulation queries)
+3. For N > 10,000: generate with networkx, optionally convert to igraph for neighbor lookups during simulation
+4. Pre-generate and cache graphs: generate once, pickle/serialize, reuse across simulation ticks
+5. Consider **igraph** if neighbor-query performance becomes bottleneck during simulation loop
+
+```python
+# Conversion between networkx and igraph
+import igraph as ig
+
+def nx_to_igraph(G: nx.Graph) -> ig.Graph:
+    """Convert networkx graph to igraph for faster algorithms."""
+    mapping = {node: idx for idx, node in enumerate(G.nodes())}
+    edges = [(mapping[u], mapping[v]) for u, v in G.edges()]
+
+    ig_graph = ig.Graph(n=G.number_of_nodes(), edges=edges, directed=G.is_directed())
+
+    # Transfer node attributes
+    for attr in list(G.nodes[list(G.nodes())[0]].keys()):
+        ig_graph.vs[attr] = [G.nodes[n].get(attr) for n in G.nodes()]
+
+    return ig_graph, mapping
+```
+
+### 6. Validation Checklist
+
+After generating a graph, verify these properties match empirical targets:
+
+```python
+def validate_graph(G: nx.Graph, platform: str = "public") -> dict:
+    """Validate that generated graph has realistic social network properties."""
+    n = G.number_of_nodes()
+    m = G.number_of_edges()
+    degrees = [d for _, d in G.degree()]
+
+    stats = {
+        "nodes": n,
+        "edges": m,
+        "avg_degree": sum(degrees) / n,
+        "max_degree": max(degrees),
+        "density": nx.density(G),
+        "n_communities": len({frozenset(G.nodes[v]["community"]) for v in G}),
+    }
+
+    # Clustering (sample for large graphs)
+    if n <= 10000:
+        stats["avg_clustering"] = nx.average_clustering(G)
+    else:
+        sample = random.sample(list(G.nodes()), 1000)
+        stats["avg_clustering"] = nx.average_clustering(G, nodes=sample)
+
+    # Connected components
+    if not G.is_directed():
+        stats["n_components"] = nx.number_connected_components(G)
+        largest_cc = max(nx.connected_components(G), key=len)
+        stats["largest_component_fraction"] = len(largest_cc) / n
+
+    return stats
+```
+
+### 7. Key References
+- Scale-free networks: https://en.wikipedia.org/wiki/Scale-free_network
+- LFR benchmark: https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.LFR_benchmark_graph.html
+- Twitter power-law exponents: https://www.johndcook.com/blog/2022/08/09/twitter-follower-distribution/
+- Twitter small-world: https://arxiv.org/pdf/1508.03594
+- SBM in networkx: https://networkx.org/documentation/stable/reference/generated/networkx.generators.community.stochastic_block_model.html
+- Graph library benchmarks: https://www.timlrx.com/blog/benchmark-of-popular-graph-network-packages-v2/
+- Power-law origins in social networks: https://www.nature.com/articles/srep01783
+- Twitter degree distribution study: https://www.ece.ucdavis.edu/~chuah/rubinet/people/chuah/classes/eec273/eec273-s14/refs/%5BKL+10%5Dwww-twitter.pdf

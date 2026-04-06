@@ -18,11 +18,15 @@ Build SwarmSight AI from scratch — a SaaS platform for multi-agent social medi
 - [x] Write comprehensive PRD based on grill-me findings
 - [x] Submit as GitHub issue (#1)
 
-### Phase 3: Architecture Design `status: pending`
-- [ ] Define system architecture
-- [ ] Define data models
-- [ ] Define API contracts
-- [ ] Define frontend structure
+### Phase 3: Architecture Design `status: complete`
+- [x] Define system architecture (SIMULATION_ENGINE_BLUEPRINT.md)
+- [x] Define data models (Persona, AgentState, Actions, Events)
+- [x] Define simulation loop (Activation → Feed → LLM → Actions → Metrics → Events)
+- [x] Define willingness scoring (Socialtrait-inspiriert, eigene Formel)
+- [x] Define memory system (sliding window + importance + summary)
+- [x] Define tiered agent architecture (Creator 1% / Contributor 9% / Lurker 90%)
+- [x] Define prompt architecture (cacheable prefix + dynamic suffix)
+- [x] Define anti-sycophancy measures (zealots, inertia, bounded confidence)
 
 ### Phase 4: Issue Breakdown `status: complete`
 - [x] Break PRD into 13 vertical-slice GitHub issues (#2-#14)
