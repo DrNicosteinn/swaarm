@@ -123,10 +123,27 @@
 - AI_SYSTEM_CARD.md for EU AI Act compliance
 - CORS restricted, Swagger disabled in production
 
-#### Steps 9-12 — NEXT
-- Metrics & QA, Error Handling, Checkpoint, Integration Test
+#### Steps 9-12 ✅
+- Quality metrics (Shannon entropy, Gini, trigram uniqueness, badge system)
+- Circuit breaker (15% failure → pause, budget safety)
+- Checkpoint system (save every 5 rounds, keep last 3, resume)
+- All 136 tests passing, merged to main
 
-**Running total: 95+ tests, all green**
+### Issue #5: Persona Generator ✅
+**Branch:** `feature/persona-generator` → merged to main
+**Commit:** `c661136`
+- Batch LLM generation (~500 base personas in batches of 10)
+- DACH demographics (age, country, region calibration)
+- Stakeholder templates (corporate crisis, product launch, employer branding, default)
+- Sinus-Milieus integration
+- Parametric variation for scaling 500 → 50k
+- Zealot (7%) + contrarian (5%) assignment
+- Fallback generation without LLM
+- **Tests:** 14/14 passed
+
+**Running total: 150 tests, all green**
+
+### Issue #6: Prompt Builder — IN PROGRESS
 
 ### Errors
 (none)
