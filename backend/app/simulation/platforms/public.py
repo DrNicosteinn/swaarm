@@ -12,8 +12,6 @@ import uuid
 
 from app.models.actions import AgentAction, FeedItem
 from app.models.persona import Persona
-from app.simulation.database import SimulationDB
-from app.simulation.graph import SocialGraph
 from app.simulation.platforms.base import PlatformBase
 
 # Twitter open-source engagement weights
@@ -166,8 +164,7 @@ class PublicNetworkPlatform(PlatformBase):
         agent_community = self.graph.get_community(agent_id)
         tail = scored_posts[n_relevant:]
         cross_community = [
-            p for p, _ in tail
-            if self.graph.get_community(p["author_id"]) != agent_community
+            p for p, _ in tail if self.graph.get_community(p["author_id"]) != agent_community
         ]
         if len(cross_community) >= n_diverse:
             feed_posts.extend(random.sample(cross_community, n_diverse))
@@ -251,7 +248,7 @@ class PublicNetworkPlatform(PlatformBase):
             tags = " ".join(f"#{t}" for t in item.hashtags[:3])
             engagement = f"{item.likes}L {item.comments}K {item.reposts}R"
 
-            line = f"[{item.post_id}] @{item.author_id} ({age_str}): \"{item.content[:120]}\" | {engagement}"
+            line = f'[{item.post_id}] @{item.author_id} ({age_str}): "{item.content[:120]}" | {engagement}'
             if tags:
                 line += f" {tags}"
             lines.append(line)
@@ -272,18 +269,26 @@ class PublicNetworkPlatform(PlatformBase):
                 hashtags=action.hashtags,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
-                content=action.content, metadata={"post_id": post_id},
+                action.round_number,
+                action.agent_id,
+                action_type,
+                content=action.content,
+                metadata={"post_id": post_id},
             )
             return True
 
         elif action_type == "like_post" and action.target_post_id:
             like_id = f"l-{uuid.uuid4().hex[:8]}"
             await self.db.insert_like(
-                like_id, action.target_post_id, action.agent_id, action.round_number,
+                like_id,
+                action.target_post_id,
+                action.agent_id,
+                action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
+                action.round_number,
+                action.agent_id,
+                action_type,
                 target_id=action.target_post_id,
             )
             return True
@@ -291,10 +296,15 @@ class PublicNetworkPlatform(PlatformBase):
         elif action_type == "repost" and action.target_post_id:
             repost_id = f"r-{uuid.uuid4().hex[:8]}"
             await self.db.insert_repost(
-                repost_id, action.target_post_id, action.agent_id, action.round_number,
+                repost_id,
+                action.target_post_id,
+                action.agent_id,
+                action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
+                action.round_number,
+                action.agent_id,
+                action_type,
                 target_id=action.target_post_id,
             )
             return True
@@ -302,29 +312,41 @@ class PublicNetworkPlatform(PlatformBase):
         elif action_type == "comment" and action.target_post_id:
             comment_id = f"c-{uuid.uuid4().hex[:8]}"
             await self.db.insert_comment(
-                comment_id, action.target_post_id, action.agent_id,
-                action.content or "", action.round_number,
+                comment_id,
+                action.target_post_id,
+                action.agent_id,
+                action.content or "",
+                action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
-                content=action.content, target_id=action.target_post_id,
+                action.round_number,
+                action.agent_id,
+                action_type,
+                content=action.content,
+                target_id=action.target_post_id,
             )
             return True
 
         elif action_type == "follow_user" and action.target_user_id:
             await self.db.insert_follow(
-                action.agent_id, action.target_user_id, action.round_number,
+                action.agent_id,
+                action.target_user_id,
+                action.round_number,
             )
             self.graph.add_edge(action.agent_id, action.target_user_id)
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
+                action.round_number,
+                action.agent_id,
+                action_type,
                 target_id=action.target_user_id,
             )
             return True
 
         elif action_type == "do_nothing":
             await self.db.log_action(
-                action.round_number, action.agent_id, action_type,
+                action.round_number,
+                action.agent_id,
+                action_type,
             )
             return True
 

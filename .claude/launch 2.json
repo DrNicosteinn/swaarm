@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/Users/nicopfammatter/.local/bin/uv",
+      "runtimeArgs": ["run", "python", "run.py"],
+      "cwd": "backend",
+      "port": 5001
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "3000"],
+      "cwd": "frontend",
+      "port": 3000
+    }
+  ]
+}

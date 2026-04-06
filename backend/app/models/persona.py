@@ -1,12 +1,12 @@
 """Persona models — static agent identity that doesn't change during simulation."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class AgentTier(str, Enum):
+class AgentTier(StrEnum):
     """Agent activity tier based on scenario-driven distribution."""
 
     POWER_CREATOR = "power_creator"

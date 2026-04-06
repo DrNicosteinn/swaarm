@@ -1,12 +1,12 @@
 """Action models — what agents can do on the simulated platforms."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class PublicNetworkAction(str, Enum):
+class PublicNetworkAction(StrEnum):
     """Actions available on the public network (Twitter-like)."""
 
     CREATE_POST = "create_post"
@@ -17,7 +17,7 @@ class PublicNetworkAction(str, Enum):
     DO_NOTHING = "do_nothing"
 
 
-class ProfessionalNetworkAction(str, Enum):
+class ProfessionalNetworkAction(StrEnum):
     """Actions available on the professional network (LinkedIn-like)."""
 
     POST = "create_post"

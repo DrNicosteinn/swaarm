@@ -1,9 +1,8 @@
 """Tests for willingness scoring system."""
 
 import numpy as np
-import pytest
 
-from app.models.persona import AgentTier, BigFive, Persona, PostingStyle, OpinionSeeds
+from app.models.persona import AgentTier, BigFive, Persona, PostingStyle
 from app.models.simulation import ScenarioControversity
 from app.simulation.willingness import WillingnessScorer
 
@@ -44,7 +43,9 @@ class TestWillingnessScorer:
     def test_persona_scores_range(self):
         """All persona scores should be between 0 and 1."""
         personas = [
-            _make_persona("high", tier=AgentTier.POWER_CREATOR, extraversion=0.9, frequency="daily"),
+            _make_persona(
+                "high", tier=AgentTier.POWER_CREATOR, extraversion=0.9, frequency="daily"
+            ),
             _make_persona("low", tier=AgentTier.OBSERVER, extraversion=0.1, frequency="rarely"),
         ]
         scorer = WillingnessScorer(personas, ScenarioControversity.STANDARD, seed=42)

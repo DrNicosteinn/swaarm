@@ -3,8 +3,9 @@
 from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app.api.auth import router as auth_router
@@ -36,15 +37,33 @@ app = FastAPI(
     version="0.1.0",
     description="Pre-Testing Platform for Strategic Communications",
     lifespan=lifespan,
+    docs_url="/api/docs" if settings.debug else None,  # Disable Swagger in production
+    redoc_url=None,
 )
 
-# CORS
+
+# Global exception handler — never leak internal errors to client
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch all unhandled exceptions. Log details, return generic error."""
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc!s}")
+    if settings.sentry_dsn:
+        sentry_sdk.capture_exception(exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Ein interner Fehler ist aufgetreten. Bitte versuche es später erneut."
+        },
+    )
+
+
+# CORS — restrict in production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Routers

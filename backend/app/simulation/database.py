@@ -123,7 +123,9 @@ class SimulationDB:
             await db.commit()
         self._initialized = True
 
-    async def insert_user(self, user_id: str, name: str, persona_json: str, state_json: str) -> None:
+    async def insert_user(
+        self, user_id: str, name: str, persona_json: str, state_json: str
+    ) -> None:
         """Insert a user/agent into the simulation."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -132,9 +134,7 @@ class SimulationDB:
             )
             await db.commit()
 
-    async def insert_users_batch(
-        self, users: list[tuple[str, str, str, str]]
-    ) -> None:
+    async def insert_users_batch(self, users: list[tuple[str, str, str, str]]) -> None:
         """Batch insert users. Each tuple: (id, name, persona_json, state_json)."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.executemany(
@@ -190,9 +190,7 @@ class SimulationDB:
                 (comment_id, post_id, author_id, content, created_round, parent_comment_id),
             )
             # Increment comment count on post
-            await db.execute(
-                "UPDATE posts SET comments = comments + 1 WHERE id = ?", (post_id,)
-            )
+            await db.execute("UPDATE posts SET comments = comments + 1 WHERE id = ?", (post_id,))
             await db.commit()
 
     async def insert_like(
@@ -210,14 +208,10 @@ class SimulationDB:
                    VALUES (?, ?, ?, ?, ?)""",
                 (like_id, post_id, user_id, reaction_type, created_round),
             )
-            await db.execute(
-                "UPDATE posts SET likes = likes + 1 WHERE id = ?", (post_id,)
-            )
+            await db.execute("UPDATE posts SET likes = likes + 1 WHERE id = ?", (post_id,))
             await db.commit()
 
-    async def insert_follow(
-        self, follower_id: str, followed_id: str, created_round: int
-    ) -> None:
+    async def insert_follow(self, follower_id: str, followed_id: str, created_round: int) -> None:
         """Insert a follow relationship. Ignores duplicates."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -235,9 +229,7 @@ class SimulationDB:
                 "INSERT INTO reposts (id, post_id, user_id, created_round) VALUES (?, ?, ?, ?)",
                 (repost_id, post_id, user_id, created_round),
             )
-            await db.execute(
-                "UPDATE posts SET reposts = reposts + 1 WHERE id = ?", (post_id,)
-            )
+            await db.execute("UPDATE posts SET reposts = reposts + 1 WHERE id = ?", (post_id,))
             await db.commit()
 
     async def log_action(
@@ -254,12 +246,22 @@ class SimulationDB:
             await db.execute(
                 """INSERT INTO action_log (round_number, agent_id, action_type, content, target_id, metadata)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (round_number, agent_id, action_type, content, target_id, json.dumps(metadata or {})),
+                (
+                    round_number,
+                    agent_id,
+                    action_type,
+                    content,
+                    target_id,
+                    json.dumps(metadata or {}),
+                ),
             )
             await db.commit()
 
     async def log_actions_batch(self, actions: list[tuple]) -> None:
-        """Batch log actions. Each tuple: (round, agent_id, action_type, content, target_id, metadata_json)."""
+        """Batch log actions.
+
+        Each tuple: (round, agent_id, action_type, content, target_id, metadata_json).
+        """
         async with aiosqlite.connect(self.db_path) as db:
             await db.executemany(
                 """INSERT INTO action_log (round_number, agent_id, action_type, content, target_id, metadata)
@@ -268,9 +270,7 @@ class SimulationDB:
             )
             await db.commit()
 
-    async def get_posts_for_feed(
-        self, max_round: int, limit: int = 100
-    ) -> list[dict]:
+    async def get_posts_for_feed(self, max_round: int, limit: int = 100) -> list[dict]:
         """Get recent posts for feed generation."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row

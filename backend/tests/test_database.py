@@ -1,6 +1,5 @@
 """Tests for simulation SQLite database."""
 
-import json
 import os
 import tempfile
 

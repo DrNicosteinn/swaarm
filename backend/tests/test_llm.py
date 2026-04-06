@@ -1,7 +1,5 @@
 """Tests for LLM adapter layer."""
 
-import pytest
-
 from app.llm.base import LLMResponse, LLMUsageTracker
 
 
@@ -97,11 +95,13 @@ class TestLLMUsageTracker:
     def test_multiple_records(self):
         tracker = LLMUsageTracker(model="gpt-4o-mini")
         for _ in range(5):
-            tracker.record(LLMResponse(
-                input_tokens=100,
-                output_tokens=50,
-                model="gpt-4o-mini",
-            ))
+            tracker.record(
+                LLMResponse(
+                    input_tokens=100,
+                    output_tokens=50,
+                    model="gpt-4o-mini",
+                )
+            )
 
         assert tracker.total_calls == 5
         assert tracker.total_input_tokens == 500
@@ -118,9 +118,11 @@ class TestLLMUsageTracker:
         tracker = LLMUsageTracker()
         assert tracker.model == ""
 
-        tracker.record(LLMResponse(
-            input_tokens=10,
-            output_tokens=5,
-            model="gpt-4o-mini",
-        ))
+        tracker.record(
+            LLMResponse(
+                input_tokens=10,
+                output_tokens=5,
+                model="gpt-4o-mini",
+            )
+        )
         assert tracker.model == "gpt-4o-mini"

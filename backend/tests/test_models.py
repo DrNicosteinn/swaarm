@@ -2,17 +2,16 @@
 
 import pytest
 
-from app.models.persona import AgentTier, BigFive, Persona, PostingStyle
-from app.models.agent import AgentMemory, AgentState
 from app.models.actions import AgentAction, FeedItem, PublicNetworkAction
+from app.models.agent import AgentMemory, AgentState
+from app.models.persona import AgentTier, BigFive, Persona
 from app.models.simulation import (
     PlatformType,
-    ScenarioControversity,
-    SimulationConfig,
-    SimulationStatus,
-    TierDistribution,
     QualityMetrics,
     RoundMetrics,
+    ScenarioControversity,
+    SimulationConfig,
+    TierDistribution,
 )
 
 
@@ -60,8 +59,13 @@ class TestPersona:
 
     def test_big_five_validation(self):
         with pytest.raises(ValueError):
-            BigFive(openness=1.5, conscientiousness=0.5, extraversion=0.5,
-                    agreeableness=0.5, neuroticism=0.5)
+            BigFive(
+                openness=1.5,
+                conscientiousness=0.5,
+                extraversion=0.5,
+                agreeableness=0.5,
+                neuroticism=0.5,
+            )
 
     def test_zealot_persona(self):
         persona = Persona(
@@ -73,8 +77,11 @@ class TestPersona:
             region="Bayern",
             occupation="Aktivist",
             big_five=BigFive(
-                openness=0.3, conscientiousness=0.6, extraversion=0.9,
-                agreeableness=0.2, neuroticism=0.7,
+                openness=0.3,
+                conscientiousness=0.6,
+                extraversion=0.9,
+                agreeableness=0.2,
+                neuroticism=0.7,
             ),
             is_zealot=True,
             is_contrarian=False,

@@ -35,8 +35,16 @@ class LLMUsageTracker(BaseModel):
     def total_cost_usd(self) -> float:
         """Estimate total cost based on model pricing."""
         pricing = {
-            "gpt-4o-mini": {"input": 0.15 / 1_000_000, "output": 0.60 / 1_000_000, "cached": 0.075 / 1_000_000},
-            "gpt-4o": {"input": 2.50 / 1_000_000, "output": 10.00 / 1_000_000, "cached": 1.25 / 1_000_000},
+            "gpt-4o-mini": {
+                "input": 0.15 / 1_000_000,
+                "output": 0.60 / 1_000_000,
+                "cached": 0.075 / 1_000_000,
+            },
+            "gpt-4o": {
+                "input": 2.50 / 1_000_000,
+                "output": 10.00 / 1_000_000,
+                "cached": 1.25 / 1_000_000,
+            },
         }
         rates = pricing.get(self.model, pricing["gpt-4o-mini"])
         uncached_input = self.total_input_tokens - self.total_cached_tokens

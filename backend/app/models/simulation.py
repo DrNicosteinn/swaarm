@@ -1,20 +1,20 @@
 """Simulation configuration and result models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class PlatformType(str, Enum):
+class PlatformType(StrEnum):
     """Available simulated platforms."""
 
     PUBLIC = "public"  # Twitter-like
     PROFESSIONAL = "professional"  # LinkedIn-like
 
 
-class SimulationStatus(str, Enum):
+class SimulationStatus(StrEnum):
     """Lifecycle status of a simulation."""
 
     PENDING = "pending"
@@ -24,7 +24,7 @@ class SimulationStatus(str, Enum):
     PAUSED = "paused"
 
 
-class ScenarioControversity(str, Enum):
+class ScenarioControversity(StrEnum):
     """How controversial the scenario is — drives agent activity distribution."""
 
     ROUTINE = "routine"  # 30% active
@@ -105,7 +105,9 @@ class RoundMetrics(BaseModel):
     reposts: int
     follows: int
     avg_sentiment: float = 0.0
-    sentiment_distribution: dict[str, int] = Field(default_factory=dict)  # positive/neutral/negative
+    sentiment_distribution: dict[str, int] = Field(
+        default_factory=dict
+    )  # positive/neutral/negative
     llm_calls: int = 0
     tokens_used: int = 0
     cost_usd: float = 0.0

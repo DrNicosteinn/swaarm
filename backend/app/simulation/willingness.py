@@ -10,7 +10,6 @@ from loguru import logger
 from app.models.persona import AgentTier, Persona
 from app.models.simulation import ScenarioControversity
 
-
 # Tier-specific base bonuses and cooldown rounds
 TIER_CONFIG = {
     AgentTier.POWER_CREATOR: {"bonus": 0.80, "cooldown": 2},
@@ -26,7 +25,12 @@ class WillingnessScorer:
     Uses vectorized numpy operations — <5ms for 50k agents.
     """
 
-    def __init__(self, personas: list[Persona], controversity: ScenarioControversity, seed: int | None = None):
+    def __init__(
+        self,
+        personas: list[Persona],
+        controversity: ScenarioControversity,
+        seed: int | None = None,
+    ):
         self.n_agents = len(personas)
         self.rng = np.random.default_rng(seed)
 
@@ -34,12 +38,8 @@ class WillingnessScorer:
         self.persona_scores = self._compute_persona_scores(personas)
 
         # Pre-compute tier info
-        self.tier_indices = np.array([
-            list(AgentTier).index(p.agent_tier) for p in personas
-        ])
-        self.cooldowns = np.array([
-            TIER_CONFIG[p.agent_tier]["cooldown"] for p in personas
-        ])
+        self.tier_indices = np.array([list(AgentTier).index(p.agent_tier) for p in personas])
+        self.cooldowns = np.array([TIER_CONFIG[p.agent_tier]["cooldown"] for p in personas])
 
         # Controversity affects the overall activation scale
         self.activation_scale = {

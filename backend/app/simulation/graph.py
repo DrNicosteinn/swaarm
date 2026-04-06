@@ -14,7 +14,6 @@ from loguru import logger
 from app.models.persona import AgentTier, Persona
 from app.models.simulation import PlatformType
 
-
 # LFR-inspired parameters per platform
 GRAPH_PARAMS = {
     PlatformType.PUBLIC: {
@@ -89,7 +88,7 @@ class SocialGraph:
             self.graph.add_node(persona.id, community=0)
 
         ids = [p.id for p in personas]
-        for i, p in enumerate(personas):
+        for _i, p in enumerate(personas):
             # Each agent connects to 2-3 random others
             n_connections = min(rng.randint(2, 3), len(ids) - 1)
             targets = [t for t in ids if t != p.id]
@@ -99,7 +98,7 @@ class SocialGraph:
 
     def _build_community_graph(self, personas: list[Persona], rng: random.Random) -> None:
         """Build graph with community structure based on stakeholder roles."""
-        n = len(personas)
+        len(personas)
 
         # Group personas by stakeholder role (= communities)
         communities: dict[str, list[Persona]] = {}
@@ -114,7 +113,7 @@ class SocialGraph:
 
         # Intra-community edges (dense connections within groups)
         params = GRAPH_PARAMS[self.platform]
-        for role, members in communities.items():
+        for _role, members in communities.items():
             member_ids = [p.id for p in members]
             n_members = len(member_ids)
             if n_members < 2:
@@ -144,7 +143,9 @@ class SocialGraph:
         for creator in creators:
             # Influencers get 3-5x more connections than average
             n_extra = max(3, int(len(all_ids) * 0.02))
-            targets = [t for t in all_ids if t != creator.id and not self.graph.has_edge(creator.id, t)]
+            targets = [
+                t for t in all_ids if t != creator.id and not self.graph.has_edge(creator.id, t)
+            ]
             rng.shuffle(targets)
             for target in targets[:n_extra]:
                 self.graph.add_edge(creator.id, target)

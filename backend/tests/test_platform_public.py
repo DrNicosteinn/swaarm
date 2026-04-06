@@ -6,7 +6,7 @@ import tempfile
 import pytest
 
 from app.models.actions import AgentAction
-from app.models.persona import AgentTier, BigFive, Persona
+from app.models.persona import BigFive, Persona
 from app.models.simulation import PlatformType
 from app.simulation.database import SimulationDB
 from app.simulation.graph import SocialGraph
@@ -22,8 +22,13 @@ def _make_persona(id: str, interests: list[str] | None = None) -> Persona:
         country="CH",
         region="Zürich",
         occupation="Test",
-        big_five=BigFive(openness=0.5, conscientiousness=0.5, extraversion=0.5,
-                         agreeableness=0.5, neuroticism=0.5),
+        big_five=BigFive(
+            openness=0.5,
+            conscientiousness=0.5,
+            extraversion=0.5,
+            agreeableness=0.5,
+            neuroticism=0.5,
+        ),
         interests=interests or [],
     )
 
@@ -82,7 +87,7 @@ class TestPublicNetworkPlatform:
 
     @pytest.mark.asyncio
     async def test_execute_create_post(self, platform):
-        plat, personas = platform
+        plat, _personas = platform
         action = AgentAction(
             agent_id="u0",
             round_number=1,
@@ -100,7 +105,7 @@ class TestPublicNetworkPlatform:
 
     @pytest.mark.asyncio
     async def test_execute_like_post(self, platform):
-        plat, personas = platform
+        plat, _personas = platform
         # Create a post first
         await plat.db.insert_post("p1", "u0", "Test post", created_round=1)
 
@@ -115,7 +120,7 @@ class TestPublicNetworkPlatform:
 
     @pytest.mark.asyncio
     async def test_execute_comment(self, platform):
-        plat, personas = platform
+        plat, _personas = platform
         await plat.db.insert_post("p1", "u0", "Test post", created_round=1)
 
         action = AgentAction(
@@ -130,7 +135,7 @@ class TestPublicNetworkPlatform:
 
     @pytest.mark.asyncio
     async def test_execute_follow(self, platform):
-        plat, personas = platform
+        plat, _personas = platform
         action = AgentAction(
             agent_id="u0",
             round_number=1,
@@ -143,7 +148,7 @@ class TestPublicNetworkPlatform:
 
     @pytest.mark.asyncio
     async def test_execute_do_nothing(self, platform):
-        plat, personas = platform
+        plat, _personas = platform
         action = AgentAction(
             agent_id="u0",
             round_number=1,
@@ -199,6 +204,7 @@ class TestPublicNetworkPlatform:
 
 def _make_feed_item(post_id, author_id, content, round=1, likes=0, comments=0):
     from app.models.actions import FeedItem
+
     return FeedItem(
         post_id=post_id,
         author_id=author_id,

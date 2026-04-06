@@ -6,8 +6,6 @@ This ensures the simulation engine is platform-agnostic.
 
 from abc import ABC, abstractmethod
 
-import numpy as np
-
 from app.models.actions import AgentAction, FeedItem
 from app.models.persona import Persona
 from app.simulation.database import SimulationDB

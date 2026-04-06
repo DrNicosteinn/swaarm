@@ -5,7 +5,9 @@ from app.models.simulation import PlatformType
 from app.simulation.graph import SocialGraph
 
 
-def _make_persona(id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER, role: str = "general") -> Persona:
+def _make_persona(
+    id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER, role: str = "general"
+) -> Persona:
     """Helper to create a test persona."""
     return Persona(
         id=id,
@@ -15,8 +17,13 @@ def _make_persona(id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER, role: s
         country="CH",
         region="Zürich",
         occupation="Testperson",
-        big_five=BigFive(openness=0.5, conscientiousness=0.5, extraversion=0.5,
-                         agreeableness=0.5, neuroticism=0.5),
+        big_five=BigFive(
+            openness=0.5,
+            conscientiousness=0.5,
+            extraversion=0.5,
+            agreeableness=0.5,
+            neuroticism=0.5,
+        ),
         agent_tier=tier,
         stakeholder_role=role,
     )
@@ -52,10 +59,9 @@ class TestSocialGraphPublic:
 
     def test_influencer_hubs_have_more_connections(self):
         graph = SocialGraph(PlatformType.PUBLIC)
-        personas = (
-            [_make_persona("influencer-1", tier=AgentTier.POWER_CREATOR, role="media")]
-            + [_make_persona(f"user-{i}", role="general") for i in range(50)]
-        )
+        personas = [_make_persona("influencer-1", tier=AgentTier.POWER_CREATOR, role="media")] + [
+            _make_persona(f"user-{i}", role="general") for i in range(50)
+        ]
         graph.initialize(personas, seed=42)
 
         influencer_degree = graph.get_degree("influencer-1")
@@ -117,10 +123,9 @@ class TestSocialGraphProfessional:
         public = SocialGraph(PlatformType.PUBLIC)
         professional = SocialGraph(PlatformType.PROFESSIONAL)
 
-        personas = (
-            [_make_persona(f"a-{i}", role="team_a") for i in range(25)]
-            + [_make_persona(f"b-{i}", role="team_b") for i in range(25)]
-        )
+        personas = [_make_persona(f"a-{i}", role="team_a") for i in range(25)] + [
+            _make_persona(f"b-{i}", role="team_b") for i in range(25)
+        ]
 
         public.initialize(personas, seed=42)
         professional.initialize(personas, seed=42)
