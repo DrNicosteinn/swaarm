@@ -42,24 +42,31 @@ class StructuredScenario(BaseModel):
 
 ANALYSIS_PROMPT = (
     "Du analysierst Kommunikationsszenarien für eine Social-Media-Simulation.\n\n"
-    "Analysiere diesen Freitext und extrahiere die relevanten Informationen:\n\n"
+    "Analysiere diesen Freitext und extrahiere ALLE erkennbaren Informationen.\n"
+    "Fülle so viele Felder wie möglich aus — auch wenn sie nur implizit "
+    "im Text stehen (z.B. 'Novartis' → industry='Pharma', company='Novartis', "
+    "market='CH').\n\n"
     '"{user_input}"\n\n'
-    "Antworte als JSON mit diesen Feldern:\n"
+    "Antworte als JSON:\n"
     "{{\n"
-    '  "industry": "Branche (z.B. Versicherung, Pharma, Tech)",\n'
-    '  "company": "Firmenname falls genannt",\n'
-    '  "target_audience": "Zielgruppe",\n'
-    '  "market": "Markt (DE, CH, AT, oder DACH)",\n'
-    '  "statement": "Das Statement/die Kampagne die getestet werden soll",\n'
+    '  "industry": "Branche — IMMER ausfüllen wenn erkennbar",\n'
+    '  "company": "Firmenname — IMMER ausfüllen wenn genannt",\n'
+    '  "target_audience": "Zielgruppe — z.B. Mitarbeiter, Kunden, Öffentlichkeit",\n'
+    '  "market": "Markt — DE, CH, AT oder DACH. Aus Kontext ableiten!",\n'
+    '  "statement": "Das Statement oder die Frage des Users",\n'
     '  "context": "Relevanter Kontext und Hintergründe",\n'
     '  "scenario_type": "corporate_crisis / product_launch / employer_branding / default",\n'
-    '  "controversity_score": 0.0 bis 1.0 (wie kontrovers ist das Szenario?),\n'
-    '  "missing_fields": ["Liste von fehlenden aber wichtigen Informationen"],\n'
-    '  "suggestions": ["Konkrete Verbesserungsvorschläge für den Input"],\n'
-    '  "seed_posts": ["2-3 realistische Posts die als Auslöser der Diskussion dienen"],\n'
-    '  "stakeholder_hint": "Welche Stakeholder-Gruppen besonders relevant sind"\n'
+    '  "controversity_score": 0.0-1.0,\n'
+    '  "missing_fields": ["NUR Felder die WIRKLICH nicht ableitbar sind"],\n'
+    '  "suggestions": ["Konkrete Verbesserungsvorschläge"],\n'
+    '  "seed_posts": ["2-3 realistische Posts als Auslöser"],\n'
+    '  "stakeholder_hint": "Relevante Stakeholder-Gruppen"\n'
     "}}\n\n"
     "WICHTIG:\n"
+    "- Extrahiere MAXIMAL viel aus dem Text — lass keine Felder leer "
+    "die ableitbar sind\n"
+    "- Entlassungen/Stellenabbau → scenario_type='corporate_crisis', "
+    "controversity_score>=0.7\n"
     "- seed_posts sollen wie echte Social-Media-Posts klingen\n"
     "- Der erste seed_post sollte das offizielle Statement sein\n"
     "- Weitere seed_posts: eine erste Reaktion, evtl. ein Medienbericht\n"
