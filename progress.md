@@ -1,27 +1,84 @@
-# SwarmSight AI - Progress Log
+# Swaarm - Progress Log
 
-## Session 1 — 2026-04-03
+## Session 1 — 2026-04-03 (Planung)
 
 ### Actions
-- [x] Cleaned project folder (removed old backend, frontend, node_modules, configs)
-- [x] Kept: Businessplan, Competitor Research, Working Notes
-- [x] Disconnected old GitHub remote (SwarmAI)
-- [x] Connected new GitHub remote (swaarm)
-- [x] Analyzed all 3 documents
-- [x] Installed 6 skills (grill-me, write-a-prd, prd-to-issues, tdd, improve-codebase-architecture, planning-with-files)
-- [x] Created planning files (task_plan.md, findings.md, progress.md)
-- [ ] Started grill-me interview
-
-- [x] Started grill-me interview
-- [x] Completed grill-me: 29 decisions documented
-- [x] Wrote full PRD (PRD.md)
-- [ ] Submit PRD as GitHub Issue (waiting for gh auth)
-
-- [x] Submitted PRD as GitHub Issue #1
+- [x] Cleaned project folder, connected new GitHub remote (swaarm)
+- [x] Analyzed Businessplan, Competitor Research, Working Notes
+- [x] Installed 10 skills
+- [x] Completed grill-me: 29 architectural decisions documented
+- [x] Wrote full PRD (PRD.md) → GitHub Issue #1
 - [x] Created 13 vertical-slice issues (#2-#14)
-- [x] Installed 4 additional skills (designing-apis, threat-modeling, data-management, observability)
-- [x] Created CLAUDE.md with project rules and architecture
-- [x] Researched Claude Code best practices
+- [x] Created CLAUDE.md, SIMULATION_ENGINE_BLUEPRINT.md (22 Teile, 1032 Zeilen)
+- [x] Deep research: OASIS architecture, willingness scoring, agent memory, prompt engineering
+- [x] Deep research: DACH personas, social graph algorithms, narrative detection, feed algorithms
+- [x] Created BAUPLAN_ERKLAERT.docx (non-technical explanation)
+
+---
+
+## Session 2 — 2026-04-06 (Building)
+
+### Issue #2: Projekt-Setup & Infrastruktur ✅
+**Commit:** `0579866` on `main`
+- FastAPI backend with health check endpoint
+- React + Vite + Tailwind CSS frontend
+- Supabase project connected (frontend + backend)
+- OpenAI API key configured
+- Sentry + Loguru integration
+- Project structure matching PRD architecture
+- Auto-format hooks (ruff for Python, prettier for JS/TS)
+- Security gate hook (blocks force-push, rm -rf)
+- **Tests:** 1 passed (health check)
+
+### Issue #3: Auth: Registrierung & Login ✅
+**Commit:** `5f651b4` on `main`
+- Backend: Supabase JWT validation middleware, `/api/auth/me` endpoint
+- Frontend: Login page, Register page (German UI)
+- Dashboard with empty state and logout
+- Protected routes (redirect to /login)
+- useAuth hook (signIn, signUp, signOut, session management)
+- Supabase client for React (NOT Next.js — adapted correctly)
+- **Tests:** 1 passed (health check, auth tested via preview)
+- **Verified:** Login + Register pages render correctly in preview
+
+### Issue #4: Simulation Engine Core — IN PROGRESS
+**Branch:** `feature/simulation-engine` (separate branch, each step = 1 commit)
+
+#### Step 1/12: Data Models ✅
+**Commit:** `157345d`
+- Persona model: Big Five, Sinus-Milieu, stakeholder roles, opinion seeds, posting style
+- AgentState model: memory (sliding window + important + summary), cooldown, sentiment
+- Actions: PublicNetworkAction (6 types), ProfessionalNetworkAction (15 types)
+- SimulationConfig: tier distributions, controversity levels, quality metrics
+- AgentAction, FeedItem, RoundMetrics, SimulationEvent, QualityMetrics
+- **Tests:** 18/18 passed
+
+#### Step 2/12: SQLite Schema & CRUD ✅
+**Commit:** `c17752e`
+- 9 tables: users, posts, comments, likes, follows, reposts, action_log, round_metrics, checkpoints
+- WAL mode + performance pragmas (64MB cache, busy timeout)
+- Batch insert for users and action logs
+- Feed query with round filtering and engagement ordering
+- Duplicate-safe likes and follows (INSERT OR IGNORE)
+- **Tests:** 11/11 passed
+
+#### Step 3/12: Social Graph ✅
+**Commit:** `86bf0c2`
+- Community structure based on stakeholder roles
+- Directed graph for public network (Twitter-like follows)
+- Undirected graph for professional network (LinkedIn-like connections)
+- Influencer hubs (power creators get extra cross-community connections)
+- Weak ties (Granovetter bridges, ~5% inter-community edges)
+- Deterministic generation with seed parameter
+- **Tests:** 14/14 passed
+
+#### Step 4/12: LLM Adapter — NEXT
+- Abstract LLM interface (provider-agnostic)
+- OpenAI implementation (async, function calling, structured output)
+- Token usage tracking
+- Retry with exponential backoff
+
+**Running total: 43 tests, all green**
 
 ### Errors
 (none)
