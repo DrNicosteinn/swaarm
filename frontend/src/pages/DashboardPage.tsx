@@ -77,6 +77,12 @@ export function DashboardPage() {
                 : 'Willkommen bei Swaarm'}
             </p>
           </div>
+          <button
+            onClick={() => navigate('/simulation/new')}
+            className="bg-gray-900 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-gray-800 text-sm"
+          >
+            Neue Simulation
+          </button>
         </div>
 
         {loading ? (

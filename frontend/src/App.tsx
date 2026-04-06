@@ -3,6 +3,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { SimulationPage } from '@/pages/SimulationPage'
+import { NewSimulationPage } from '@/pages/NewSimulationPage'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 function App() {
@@ -18,6 +19,15 @@ function App() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/simulation/new"
+        element={
+          <ProtectedRoute>
+            <NewSimulationPage />
           </ProtectedRoute>
         }
       />
