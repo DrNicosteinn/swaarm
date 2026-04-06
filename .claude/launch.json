@@ -3,13 +3,18 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "uv",
+      "cwd": "backend",
+      "runtimeExecutable": "/Users/nicopfammatter/.local/bin/uv",
       "runtimeArgs": ["run", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0"],
       "port": 8000
     },
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
+      "cwd": "frontend",
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      },
+      "runtimeExecutable": "/opt/homebrew/bin/npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
     }
