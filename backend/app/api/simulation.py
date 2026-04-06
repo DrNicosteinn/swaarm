@@ -35,7 +35,7 @@ async def analyze_input(
     user: AuthUser = Depends(get_current_user),
 ) -> AnalyzeInputResponse:
     """Analyze free-text input and extract structured scenario."""
-    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.default_llm_model)
+    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
     builder = PromptBuilder(llm)
 
     scenario = await builder.analyze_input(request.text)
@@ -58,7 +58,7 @@ async def suggest_improvements(
     user: AuthUser = Depends(get_current_user),
 ) -> list[str]:
     """Generate improvement suggestions for an incomplete scenario."""
-    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.default_llm_model)
+    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
     builder = PromptBuilder(llm)
 
     suggestions = await builder.suggest_improvements(request.scenario)

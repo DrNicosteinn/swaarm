@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
-    default_llm_model: str = "gpt-4o-mini"
+    swaarm_llm_model: str = "gpt-4o-mini"  # Renamed to avoid collision with Claude Code env var
 
     # Redis
     redis_url: str = "redis://localhost:6379"

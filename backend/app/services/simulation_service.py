@@ -69,8 +69,8 @@ async def run_simulation_job(
     )
 
     # Create LLM provider
-    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.default_llm_model)
-    usage = LLMUsageTracker(model=settings.default_llm_model)
+    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
+    usage = LLMUsageTracker(model=settings.swaarm_llm_model)
 
     # Determine controversity level from scenario
     builder = PromptBuilder(llm)
