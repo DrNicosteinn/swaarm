@@ -243,11 +243,19 @@ class SimulationEngine:
             importance = MemoryManager.compute_importance(action.action_type)
             self.memory.record_observation(state, obs_text, importance)
 
-            # Track stats
+            # Track stats + compute sentiment from content
             if action.action_type == "create_post":
                 state.posts_created += 1
+                if action.content:
+                    from app.simulation.sentiment import compute_text_sentiment
+
+                    state.current_sentiment = compute_text_sentiment(action.content)
             elif action.action_type == "comment":
                 state.comments_created += 1
+                if action.content:
+                    from app.simulation.sentiment import compute_text_sentiment
+
+                    state.current_sentiment = compute_text_sentiment(action.content)
             elif action.action_type in ("like_post", "react_like"):
                 state.likes_given += 1
 
@@ -257,6 +265,15 @@ class SimulationEngine:
         likes_given = sum(1 for a in actions_this_round if a.action_type in ("like_post", "react_like"))
         reposts = sum(1 for a in actions_this_round if a.action_type == "repost")
         follows = sum(1 for a in actions_this_round if a.action_type in ("follow_user", "connect"))
+
+        # Compute average sentiment from active agents this round
+        from app.simulation.sentiment import compute_text_sentiment
+
+        round_sentiments = []
+        for a in actions_this_round:
+            if a.content:
+                round_sentiments.append(compute_text_sentiment(a.content))
+        avg_sentiment = sum(round_sentiments) / len(round_sentiments) if round_sentiments else 0.0
 
         round_duration = time.monotonic() - round_start
 
@@ -268,6 +285,7 @@ class SimulationEngine:
             likes_given=likes_given,
             reposts=reposts,
             follows=follows,
+            avg_sentiment=round(avg_sentiment, 3),
             llm_calls=self.usage.total_calls - sum(m.llm_calls for m in self.round_metrics),
             tokens_used=round_tokens,
             cost_usd=round(round_duration * 0, 4),  # Will be calculated from usage tracker
@@ -428,10 +446,22 @@ class SimulationEngine:
 
         return "\n".join(parts)
 
-    def _build_user_prompt(self, persona: Persona, memory_text: str, feed_text: str, round_num: int) -> str:
+    def _build_user_prompt(
+        self, persona: Persona, memory_text: str, feed_text: str, round_num: int
+    ) -> str:
         """Build the user prompt with dynamic content (memory + feed)."""
+        # Encourage creators to post original content, not just comment
+        creator_hint = ""
+        if persona.agent_tier == AgentTier.POWER_CREATOR:
+            creator_hint = (
+                "\nHINWEIS: Du bist ein aktiver Meinungsführer. "
+                "Erwäge einen eigenen Post zu erstellen mit deiner Perspektive "
+                "zum aktuellen Thema — nicht nur kommentieren.\n"
+            )
+
         return (
-            f"{memory_text}\n\n{feed_text}\n\nRunde {round_num}/{self.config.round_count}. Was willst du tun?"
+            f"{memory_text}\n\n{feed_text}\n{creator_hint}\n"
+            f"Runde {round_num}/{self.config.round_count}. Was willst du tun?"
         )
 
     def _parse_llm_response(
