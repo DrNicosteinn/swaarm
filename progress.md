@@ -94,9 +94,26 @@
 - react-force-graph-2d installiert
 - Bauplan: docs/LIVE_VIEW_BAUPLAN.md
 
-### Issue #9: Report Dashboard & PDF — NEXT
+### Issue #9: Report Generator ✅
+**Commit:** `f2ad857`
+- ReportData Model: Timeline, Narratives, Risks, Quality Badge, Costs
+- Sentiment-Timeline und Engagement-Tracking pro Runde
+- Narrative Detection (Keyword-Frequenz, Placeholder für Embedding-basiert)
+- Risk Detection: Sentiment-Drops, negative Durchschnitte, Fehlerraten
+- LLM Executive Summary (Deutsch, max 200 Wörter)
+- Quality Metrics Integration — 7 Tests
 
-**Running total: 161 Tests, 0 Lint-Fehler**
+### Issue #10: Dashboard & History ✅
+**Commit:** `30e27da`
+- Dashboard zeigt Simulationsliste von /api/simulation/list
+- Status-Badges (Wartend/Läuft/Abgeschlossen/Fehlgeschlagen)
+- Progress-Bars pro Simulation
+- Click → Navigiert zur Live-View
+- Empty State + Loading State
+
+### Issue #11: LinkedIn Engine — NEXT (Deep Research zuerst)
+
+**Running total: 168 Tests, 0 Lint-Fehler**
 
 ---
 
