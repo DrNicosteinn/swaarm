@@ -163,9 +163,7 @@ class PublicNetworkPlatform(PlatformBase):
         # Diverse: pick from lower-ranked posts, preferring different communities
         agent_community = self.graph.get_community(agent_id)
         tail = scored_posts[n_relevant:]
-        cross_community = [
-            p for p, _ in tail if self.graph.get_community(p["author_id"]) != agent_community
-        ]
+        cross_community = [p for p, _ in tail if self.graph.get_community(p["author_id"]) != agent_community]
         if len(cross_community) >= n_diverse:
             feed_posts.extend(random.sample(cross_community, n_diverse))
         elif tail:

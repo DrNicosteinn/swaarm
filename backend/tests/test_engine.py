@@ -28,16 +28,20 @@ class MockLLMProvider(LLMProvider):
         if self.call_count % 4 == 1:
             # Create a post
             return LLMResponse(
-                tool_calls=[{
-                    "id": f"call_{self.call_count}",
-                    "function": {
-                        "name": "create_post",
-                        "arguments": json.dumps({
-                            "content": f"Testpost Nummer {self.call_count}",
-                            "hashtags": ["test"],
-                        }),
-                    },
-                }],
+                tool_calls=[
+                    {
+                        "id": f"call_{self.call_count}",
+                        "function": {
+                            "name": "create_post",
+                            "arguments": json.dumps(
+                                {
+                                    "content": f"Testpost Nummer {self.call_count}",
+                                    "hashtags": ["test"],
+                                }
+                            ),
+                        },
+                    }
+                ],
                 input_tokens=500,
                 output_tokens=50,
                 model="mock-model",
@@ -45,13 +49,15 @@ class MockLLMProvider(LLMProvider):
         elif self.call_count % 4 == 2:
             # Like a post
             return LLMResponse(
-                tool_calls=[{
-                    "id": f"call_{self.call_count}",
-                    "function": {
-                        "name": "like_post",
-                        "arguments": json.dumps({"post_id": "p-initial"}),
-                    },
-                }],
+                tool_calls=[
+                    {
+                        "id": f"call_{self.call_count}",
+                        "function": {
+                            "name": "like_post",
+                            "arguments": json.dumps({"post_id": "p-initial"}),
+                        },
+                    }
+                ],
                 input_tokens=500,
                 output_tokens=30,
                 model="mock-model",
@@ -59,16 +65,20 @@ class MockLLMProvider(LLMProvider):
         elif self.call_count % 4 == 3:
             # Comment
             return LLMResponse(
-                tool_calls=[{
-                    "id": f"call_{self.call_count}",
-                    "function": {
-                        "name": "comment",
-                        "arguments": json.dumps({
-                            "post_id": "p-initial",
-                            "content": "Interessanter Punkt!",
-                        }),
-                    },
-                }],
+                tool_calls=[
+                    {
+                        "id": f"call_{self.call_count}",
+                        "function": {
+                            "name": "comment",
+                            "arguments": json.dumps(
+                                {
+                                    "post_id": "p-initial",
+                                    "content": "Interessanter Punkt!",
+                                }
+                            ),
+                        },
+                    }
+                ],
                 input_tokens=500,
                 output_tokens=40,
                 model="mock-model",
@@ -76,13 +86,15 @@ class MockLLMProvider(LLMProvider):
         else:
             # Do nothing
             return LLMResponse(
-                tool_calls=[{
-                    "id": f"call_{self.call_count}",
-                    "function": {
-                        "name": "do_nothing",
-                        "arguments": "{}",
-                    },
-                }],
+                tool_calls=[
+                    {
+                        "id": f"call_{self.call_count}",
+                        "function": {
+                            "name": "do_nothing",
+                            "arguments": "{}",
+                        },
+                    }
+                ],
                 input_tokens=300,
                 output_tokens=20,
                 model="mock-model",
@@ -102,8 +114,11 @@ def _make_persona(id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER) -> Pers
         region="Zürich",
         occupation="Testperson",
         big_five=BigFive(
-            openness=0.5, conscientiousness=0.5, extraversion=0.6,
-            agreeableness=0.5, neuroticism=0.4,
+            openness=0.5,
+            conscientiousness=0.5,
+            extraversion=0.6,
+            agreeableness=0.5,
+            neuroticism=0.4,
         ),
         agent_tier=tier,
         stakeholder_role="general",
@@ -215,10 +230,7 @@ class TestSimulationEngine:
         await engine.run()
 
         # At least some agents should have recorded activity
-        active_agents = [
-            s for s in engine.agent_states.values()
-            if s.last_active_round >= 0
-        ]
+        active_agents = [s for s in engine.agent_states.values() if s.last_active_round >= 0]
         assert len(active_agents) > 0
 
     @pytest.mark.asyncio
@@ -245,8 +257,5 @@ class TestSimulationEngine:
         await engine.run()
 
         # Check that at least one agent has memories
-        has_memory = any(
-            len(s.memory.recent_observations) > 0
-            for s in engine.agent_states.values()
-        )
+        has_memory = any(len(s.memory.recent_observations) > 0 for s in engine.agent_states.values())
         assert has_memory

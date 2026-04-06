@@ -72,13 +72,61 @@
 - Deterministic generation with seed parameter
 - **Tests:** 14/14 passed
 
-#### Step 4/12: LLM Adapter — NEXT
-- Abstract LLM interface (provider-agnostic)
-- OpenAI implementation (async, function calling, structured output)
-- Token usage tracking
-- Retry with exponential backoff
+#### Step 4/12: LLM Adapter ✅
+**Commit:** `f24b068`
+- Abstract LLMProvider interface (any provider implements chat + generate_simple)
+- OpenAI implementation: async client, function calling, prompt caching tracking
+- Retry with exponential backoff + full jitter (5 retries)
+- Error classification: rate limit → retry, bad request → permanent, timeout → retry
+- LLMUsageTracker with cost calculation (cached token pricing)
+- **Tests:** 10/10 passed
 
-**Running total: 43 tests, all green**
+#### Step 5/12: Willingness Scoring ✅
+**Commit:** `b6c0152`
+- Socialtrait-inspired: s_persona × exp(-λ × (s_context - s_persona))
+- Persona factors: extraversion, tier bonus, posting frequency, opinion strength
+- Context factors: topic relevance, network activity, emotional valence
+- Dynamic tier distribution (routine/standard/crisis)
+- Cooldown per tier (creator=2, responder=3, engager=5, observer=12)
+- Vectorized numpy — <5ms for 50k agents
+- **Tests:** 10/10 passed
+
+#### Step 6/12: Public Network Platform ✅
+**Commit:** `d6dd567`
+- Abstract PlatformBase interface
+- PublicNetworkPlatform: 6 actions via OpenAI function calling
+- Feed algorithm: Twitter engagement weights (Like=1x, RT=20x, Reply=13.5x)
+- Feed assembly: 85% relevant + 15% serendipity
+- Compact feed-to-prompt serialization (~200 tokens)
+- **Tests:** 13/13 passed
+
+#### Step 7/12: Agent Memory System ✅
+**Commit:** `1897fa6`
+- Sliding window (5 observations), importance scoring, periodic LLM summary
+- Observation text generator (German)
+- Memory prompt builder (~150 tokens budget)
+- **Tests:** 18/18 passed
+
+#### Step 8/12: Simulation Engine Core Loop ✅
+**Commit:** `1897fa6` (combined with step 7)
+- Complete round loop: activation → feed → LLM → actions → metrics → events
+- Tiered processing: full LLM / simplified / rule-based
+- Async parallel with semaphore concurrency
+- Event emission for live-streaming
+- Error recovery: failed agents degrade to observers
+- **Tests:** 7/7 passed (mock LLM)
+- **LIVE TEST with GPT-4o-mini:** 10 agents, 5 rounds, $0.0021, 17.8s ✅
+
+#### Security & Compliance ✅
+**Commit:** `c51b5ef`
+- Fixed error message leaking, global exception handler
+- AI_SYSTEM_CARD.md for EU AI Act compliance
+- CORS restricted, Swagger disabled in production
+
+#### Steps 9-12 — NEXT
+- Metrics & QA, Error Handling, Checkpoint, Integration Test
+
+**Running total: 95+ tests, all green**
 
 ### Errors
 (none)

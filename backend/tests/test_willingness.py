@@ -43,9 +43,7 @@ class TestWillingnessScorer:
     def test_persona_scores_range(self):
         """All persona scores should be between 0 and 1."""
         personas = [
-            _make_persona(
-                "high", tier=AgentTier.POWER_CREATOR, extraversion=0.9, frequency="daily"
-            ),
+            _make_persona("high", tier=AgentTier.POWER_CREATOR, extraversion=0.9, frequency="daily"),
             _make_persona("low", tier=AgentTier.OBSERVER, extraversion=0.1, frequency="rarely"),
         ]
         scorer = WillingnessScorer(personas, ScenarioControversity.STANDARD, seed=42)

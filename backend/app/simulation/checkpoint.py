@@ -4,7 +4,6 @@ Saves state every N rounds. On crash, simulation resumes from last checkpoint.
 Keeps last 3 checkpoints to limit disk usage.
 """
 
-import json
 import time
 
 import aiosqlite
@@ -56,9 +55,7 @@ class CheckpointManager:
     async def load_latest(self) -> CheckpointData | None:
         """Load the most recent checkpoint, if any."""
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute(
-                "SELECT state_json FROM checkpoints ORDER BY round_number DESC LIMIT 1"
-            )
+            cursor = await db.execute("SELECT state_json FROM checkpoints ORDER BY round_number DESC LIMIT 1")
             row = await cursor.fetchone()
 
         if row:

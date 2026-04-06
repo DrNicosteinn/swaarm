@@ -143,9 +143,7 @@ class SocialGraph:
         for creator in creators:
             # Influencers get 3-5x more connections than average
             n_extra = max(3, int(len(all_ids) * 0.02))
-            targets = [
-                t for t in all_ids if t != creator.id and not self.graph.has_edge(creator.id, t)
-            ]
+            targets = [t for t in all_ids if t != creator.id and not self.graph.has_edge(creator.id, t)]
             rng.shuffle(targets)
             for target in targets[:n_extra]:
                 self.graph.add_edge(creator.id, target)

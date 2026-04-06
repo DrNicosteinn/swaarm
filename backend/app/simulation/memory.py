@@ -7,7 +7,7 @@ Lightweight design optimized for token efficiency:
 """
 
 from app.llm.base import LLMProvider
-from app.models.agent import AgentMemory, AgentState
+from app.models.agent import AgentState
 from app.models.persona import Persona
 
 # Importance threshold: only memories scoring above this are kept
@@ -118,13 +118,13 @@ class MemoryManager:
         Used for recording what happened to an agent.
         """
         if action_type == "create_post":
-            text = f"Eigenen Post erstellt: \"{content[:80]}\"" if content else "Eigenen Post erstellt"
+            text = f'Eigenen Post erstellt: "{content[:80]}"' if content else "Eigenen Post erstellt"
             if engagement > 0:
                 text += f" ({engagement} Reaktionen)"
             return text
 
         if action_type == "comment":
-            return f"Kommentar geschrieben: \"{content[:80]}\"" if content else "Kommentiert"
+            return f'Kommentar geschrieben: "{content[:80]}"' if content else "Kommentiert"
 
         if action_type in ("like_post", "react_like", "react_celebrate", "react_insightful"):
             return f"Post von {target_info or 'jemandem'} geliked"

@@ -59,9 +59,7 @@ class SimulationEngine:
         self.persona_map: dict[str, Persona] = {p.id: p for p in personas}
 
         # Initialize agent states
-        self.agent_states: dict[str, AgentState] = {
-            p.id: AgentState(persona_id=p.id) for p in personas
-        }
+        self.agent_states: dict[str, AgentState] = {p.id: AgentState(persona_id=p.id) for p in personas}
 
         # Initialize subsystems
         self.scorer = WillingnessScorer(personas, config.controversity, seed=config.seed)
@@ -98,16 +96,18 @@ class SimulationEngine:
                 await self.db.save_round_metrics(round_num, round_metrics.model_dump_json())
 
                 # Emit round complete event
-                await self._emit_event(SimulationEvent(
-                    round=round_num,
-                    event_type="round_complete",
-                    data={
-                        "active_agents": round_metrics.active_agents,
-                        "posts_created": round_metrics.posts_created,
-                        "avg_sentiment": round_metrics.avg_sentiment,
-                        "cost_usd": round_metrics.cost_usd,
-                    },
-                ))
+                await self._emit_event(
+                    SimulationEvent(
+                        round=round_num,
+                        event_type="round_complete",
+                        data={
+                            "active_agents": round_metrics.active_agents,
+                            "posts_created": round_metrics.posts_created,
+                            "avg_sentiment": round_metrics.avg_sentiment,
+                            "cost_usd": round_metrics.cost_usd,
+                        },
+                    )
+                )
 
                 logger.info(
                     f"Round {round_num}/{self.config.round_count}: "
@@ -146,16 +146,18 @@ class SimulationEngine:
         )
 
         # Emit simulation complete event
-        await self._emit_event(SimulationEvent(
-            round=completed_rounds,
-            event_type="simulation_complete",
-            data={
-                "status": status.value,
-                "completed_rounds": completed_rounds,
-                "total_cost_usd": result.total_cost_usd,
-                "duration_seconds": elapsed,
-            },
-        ))
+        await self._emit_event(
+            SimulationEvent(
+                round=completed_rounds,
+                event_type="simulation_complete",
+                data={
+                    "status": status.value,
+                    "completed_rounds": completed_rounds,
+                    "total_cost_usd": result.total_cost_usd,
+                    "duration_seconds": elapsed,
+                },
+            )
+        )
 
         logger.info(
             f"Simulation {self.config.simulation_id} {status.value}: "
@@ -279,9 +281,7 @@ class SimulationEngine:
         """Full LLM processing for power creators and active responders."""
         async with self.semaphore:
             # Generate feed
-            feed = await self.platform.generate_feed(
-                persona.id, persona, round_num, feed_size=5
-            )
+            feed = await self.platform.generate_feed(persona.id, persona, round_num, feed_size=5)
 
             if not feed and round_num > 1:
                 # No feed available — do nothing
@@ -318,9 +318,7 @@ class SimulationEngine:
     ) -> AgentAction | None:
         """Simplified LLM processing for selective engagers."""
         async with self.semaphore:
-            feed = await self.platform.generate_feed(
-                persona.id, persona, round_num, feed_size=3
-            )
+            feed = await self.platform.generate_feed(persona.id, persona, round_num, feed_size=3)
 
             if not feed:
                 return AgentAction(
@@ -353,9 +351,7 @@ class SimulationEngine:
         self, persona: Persona, round_num: int, agent_index: int
     ) -> AgentAction | None:
         """Rule-based processing for observers. No LLM call."""
-        feed = await self.platform.generate_feed(
-            persona.id, persona, round_num, feed_size=2
-        )
+        feed = await self.platform.generate_feed(persona.id, persona, round_num, feed_size=2)
 
         if not feed:
             return AgentAction(
@@ -402,22 +398,23 @@ class SimulationEngine:
         if persona.interests:
             parts.append(f"\nINTERESSEN: {', '.join(persona.interests[:5])}")
 
-        parts.extend([
-            "",
-            "WICHTIGE REGELN:",
-            "- Du postest NUR wenn du wirklich etwas zu sagen hast",
-            f"- Dein Stil ist IMMER {persona.posting_style.tone}",
-            "- Du änderst deine Grundmeinungen NICHT leichtfertig",
-            "- Wähle genau EINE Aktion pro Runde",
-            "- Alle Inhalte auf Deutsch",
-            "",
-            self.platform.get_platform_rules_prompt(),
-        ])
+        parts.extend(
+            [
+                "",
+                "WICHTIGE REGELN:",
+                "- Du postest NUR wenn du wirklich etwas zu sagen hast",
+                f"- Dein Stil ist IMMER {persona.posting_style.tone}",
+                "- Du änderst deine Grundmeinungen NICHT leichtfertig",
+                "- Wähle genau EINE Aktion pro Runde",
+                "- Alle Inhalte auf Deutsch",
+                "",
+                self.platform.get_platform_rules_prompt(),
+            ]
+        )
 
         if persona.is_zealot:
             parts.append(
-                "\nWICHTIG: Du bist in deinen Meinungen UNERSCHÜTTERLICH. "
-                "Nichts ändert deine Haltung."
+                "\nWICHTIG: Du bist in deinen Meinungen UNERSCHÜTTERLICH. Nichts ändert deine Haltung."
             )
 
         if persona.is_contrarian:
@@ -425,13 +422,10 @@ class SimulationEngine:
 
         return "\n".join(parts)
 
-    def _build_user_prompt(
-        self, persona: Persona, memory_text: str, feed_text: str, round_num: int
-    ) -> str:
+    def _build_user_prompt(self, persona: Persona, memory_text: str, feed_text: str, round_num: int) -> str:
         """Build the user prompt with dynamic content (memory + feed)."""
         return (
-            f"{memory_text}\n\n{feed_text}\n\n"
-            f"Runde {round_num}/{self.config.round_count}. Was willst du tun?"
+            f"{memory_text}\n\n{feed_text}\n\nRunde {round_num}/{self.config.round_count}. Was willst du tun?"
         )
 
     def _parse_llm_response(

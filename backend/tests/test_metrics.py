@@ -1,5 +1,6 @@
 """Tests for simulation quality metrics."""
 
+from app.models.simulation import QualityMetrics
 from app.simulation.metrics import (
     compute_content_uniqueness,
     compute_engagement_gini,
@@ -7,7 +8,6 @@ from app.simulation.metrics import (
     compute_sentiment_entropy,
     determine_quality_badge,
 )
-from app.models.simulation import QualityMetrics
 
 
 class TestSentimentEntropy:

@@ -62,9 +62,7 @@ class HealthMonitor(BaseModel):
             return SimulationAction.PAUSE
 
         if self.consecutive_errors > self.consecutive_error_limit:
-            logger.warning(
-                f"Consecutive errors: {self.consecutive_errors}. Slowing down."
-            )
+            logger.warning(f"Consecutive errors: {self.consecutive_errors}. Slowing down.")
             return SimulationAction.SLOW_DOWN
 
         return SimulationAction.CONTINUE
@@ -75,8 +73,7 @@ class HealthMonitor(BaseModel):
 
         if self.budget_limit_usd and self.current_cost_usd > self.budget_limit_usd:
             logger.error(
-                f"Budget exceeded: ${self.current_cost_usd:.4f} > "
-                f"${self.budget_limit_usd:.4f}. Stopping."
+                f"Budget exceeded: ${self.current_cost_usd:.4f} > ${self.budget_limit_usd:.4f}. Stopping."
             )
             return SimulationAction.STOP
 
@@ -95,8 +92,6 @@ class HealthMonitor(BaseModel):
             "consecutive_errors": self.consecutive_errors,
             "current_cost_usd": round(self.current_cost_usd, 4),
             "budget_remaining_usd": (
-                round(self.budget_limit_usd - self.current_cost_usd, 4)
-                if self.budget_limit_usd
-                else None
+                round(self.budget_limit_usd - self.current_cost_usd, 4) if self.budget_limit_usd else None
             ),
         }

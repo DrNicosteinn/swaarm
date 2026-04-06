@@ -8,7 +8,6 @@ Computes quality indicators per simulation:
 """
 
 import math
-from collections import Counter
 
 import numpy as np
 

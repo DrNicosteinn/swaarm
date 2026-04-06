@@ -27,9 +27,7 @@ async def test_initialize_creates_tables(db: SimulationDB):
     import aiosqlite
 
     async with aiosqlite.connect(db.db_path) as conn:
-        cursor = await conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = [row[0] for row in await cursor.fetchall()]
 
     assert "users" in tables

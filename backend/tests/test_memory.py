@@ -14,16 +14,12 @@ class TestMemoryManager:
         assert len(self.state.memory.recent_observations) == 1
 
     def test_record_important_memory(self):
-        self.mm.record_observation(
-            self.state, "Mein Post bekam 50 Likes!", importance=8.0
-        )
+        self.mm.record_observation(self.state, "Mein Post bekam 50 Likes!", importance=8.0)
         assert len(self.state.memory.important_memories) == 1
         assert len(self.state.memory.recent_observations) == 1
 
     def test_low_importance_not_stored(self):
-        self.mm.record_observation(
-            self.state, "Scrollte durch den Feed", importance=2.0
-        )
+        self.mm.record_observation(self.state, "Scrollte durch den Feed", importance=2.0)
         assert len(self.state.memory.important_memories) == 0
         assert len(self.state.memory.recent_observations) == 1
 
@@ -39,9 +35,7 @@ class TestMemoryManager:
         assert "kritischen Post" in prompt
 
     def test_build_memory_prompt_with_important(self):
-        self.mm.record_observation(
-            self.state, "Mein Post ging viral!", importance=9.0
-        )
+        self.mm.record_observation(self.state, "Mein Post ging viral!", importance=9.0)
         prompt = self.mm.build_memory_prompt(self.state)
         assert "WICHTIGE ERINNERUNGEN" in prompt
         assert "viral" in prompt
@@ -63,22 +57,16 @@ class TestMemoryManager:
 
 class TestObservationText:
     def test_create_post(self):
-        text = MemoryManager.compute_observation_text(
-            "create_post", content="Die Krise verschärft sich"
-        )
+        text = MemoryManager.compute_observation_text("create_post", content="Die Krise verschärft sich")
         assert "Post erstellt" in text
         assert "Krise" in text
 
     def test_create_post_with_engagement(self):
-        text = MemoryManager.compute_observation_text(
-            "create_post", content="Test", engagement=15
-        )
+        text = MemoryManager.compute_observation_text("create_post", content="Test", engagement=15)
         assert "15 Reaktionen" in text
 
     def test_like(self):
-        text = MemoryManager.compute_observation_text(
-            "like_post", target_info="@MaxMueller"
-        )
+        text = MemoryManager.compute_observation_text("like_post", target_info="@MaxMueller")
         assert "MaxMueller" in text
         assert "geliked" in text
 
@@ -87,9 +75,7 @@ class TestObservationText:
         assert "beobachtet" in text
 
     def test_comment(self):
-        text = MemoryManager.compute_observation_text(
-            "comment", content="Stimmt nicht ganz"
-        )
+        text = MemoryManager.compute_observation_text("comment", content="Stimmt nicht ganz")
         assert "Kommentar" in text
 
 

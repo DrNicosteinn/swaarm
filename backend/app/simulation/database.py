@@ -123,9 +123,7 @@ class SimulationDB:
             await db.commit()
         self._initialized = True
 
-    async def insert_user(
-        self, user_id: str, name: str, persona_json: str, state_json: str
-    ) -> None:
+    async def insert_user(self, user_id: str, name: str, persona_json: str, state_json: str) -> None:
         """Insert a user/agent into the simulation."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -220,9 +218,7 @@ class SimulationDB:
             )
             await db.commit()
 
-    async def insert_repost(
-        self, repost_id: str, post_id: str, user_id: str, created_round: int
-    ) -> None:
+    async def insert_repost(self, repost_id: str, post_id: str, user_id: str, created_round: int) -> None:
         """Insert a repost/share."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(

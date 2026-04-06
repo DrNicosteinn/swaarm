@@ -51,9 +51,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         sentry_sdk.capture_exception(exc)
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": "Ein interner Fehler ist aufgetreten. Bitte versuche es später erneut."
-        },
+        content={"detail": "Ein interner Fehler ist aufgetreten. Bitte versuche es später erneut."},
     )
 
 

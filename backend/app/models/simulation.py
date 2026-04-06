@@ -105,9 +105,7 @@ class RoundMetrics(BaseModel):
     reposts: int
     follows: int
     avg_sentiment: float = 0.0
-    sentiment_distribution: dict[str, int] = Field(
-        default_factory=dict
-    )  # positive/neutral/negative
+    sentiment_distribution: dict[str, int] = Field(default_factory=dict)  # positive/neutral/negative
     llm_calls: int = 0
     tokens_used: int = 0
     cost_usd: float = 0.0

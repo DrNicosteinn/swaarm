@@ -108,9 +108,7 @@ class OpenAIProvider(LLMProvider):
             except (APITimeoutError, APIConnectionError) as e:
                 last_error = e
                 delay = self._calculate_delay(attempt)
-                logger.warning(
-                    f"Connection error (attempt {attempt + 1}): {e}, retrying in {delay:.1f}s"
-                )
+                logger.warning(f"Connection error (attempt {attempt + 1}): {e}, retrying in {delay:.1f}s")
                 await asyncio.sleep(delay)
 
             except BadRequestError as e:
@@ -122,14 +120,10 @@ class OpenAIProvider(LLMProvider):
                 last_error = e
                 if attempt < self.max_retries:
                     delay = self._calculate_delay(attempt)
-                    logger.warning(
-                        f"Unexpected error (attempt {attempt + 1}): {e}, retrying in {delay:.1f}s"
-                    )
+                    logger.warning(f"Unexpected error (attempt {attempt + 1}): {e}, retrying in {delay:.1f}s")
                     await asyncio.sleep(delay)
 
-        raise RuntimeError(
-            f"LLM call failed after {self.max_retries} retries: {last_error}"
-        ) from last_error
+        raise RuntimeError(f"LLM call failed after {self.max_retries} retries: {last_error}") from last_error
 
     async def generate_simple(self, prompt: str, temperature: float = 0.7) -> str:
         """Simple text generation without tools."""

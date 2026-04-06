@@ -5,9 +5,7 @@ from app.models.simulation import PlatformType
 from app.simulation.graph import SocialGraph
 
 
-def _make_persona(
-    id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER, role: str = "general"
-) -> Persona:
+def _make_persona(id: str, tier: AgentTier = AgentTier.ACTIVE_RESPONDER, role: str = "general") -> Persona:
     """Helper to create a test persona."""
     return Persona(
         id=id,
