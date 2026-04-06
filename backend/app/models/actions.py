@@ -50,6 +50,7 @@ class AgentAction(BaseModel):
     importance_score: float = Field(
         default=0.0, ge=0.0, le=10.0, description="Self-assessed importance of this action"
     )
+    reaction_type: str | None = None  # For LinkedIn reactions (celebrate, insightful, etc.)
     metadata: dict[str, Any] = Field(default_factory=dict)
     is_fallback: bool = False  # True if this was a fallback due to LLM error
 
@@ -70,3 +71,9 @@ class FeedItem(BaseModel):
     has_external_link: bool = False
     content_format: str = "text"  # text, image, carousel, video, link
     hashtags: list[str] = Field(default_factory=list)
+
+    # Professional network additions (optional)
+    reaction_type: str | None = None  # like, celebrate, insightful, support, love, funny
+    via_connection_id: str | None = None  # "You see this because X commented"
+    via_connection_name: str | None = None
+    author_headline: str | None = None  # e.g. "VP Engineering at Acme"
