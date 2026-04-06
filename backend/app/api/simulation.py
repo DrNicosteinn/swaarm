@@ -117,7 +117,7 @@ async def _run_simulation_background(
     _simulation_jobs[simulation_id]["status"] = SimulationStatus.RUNNING.value
 
     try:
-        result = await run_simulation_job(user_id, request)
+        result = await run_simulation_job(user_id, request, simulation_id=simulation_id)
         _simulation_jobs[simulation_id]["status"] = result.status.value
         _simulation_jobs[simulation_id]["result"] = result.model_dump()
         _simulation_jobs[simulation_id]["current_round"] = result.completed_rounds

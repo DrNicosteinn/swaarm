@@ -55,12 +55,14 @@ class SimulationRecord(BaseModel):
 async def run_simulation_job(
     user_id: str,
     request: SimulationRequest,
+    simulation_id: str | None = None,
 ) -> SimulationResult:
     """Run a complete simulation end-to-end.
 
     This is the function that ARQ calls as a background job.
     """
-    simulation_id = f"sim-{uuid.uuid4().hex[:12]}"
+    if not simulation_id:
+        simulation_id = f"sim-{uuid.uuid4().hex[:12]}"
 
     logger.info(
         f"Starting simulation {simulation_id} for user {user_id}: "
