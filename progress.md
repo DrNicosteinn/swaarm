@@ -111,9 +111,22 @@
 - Click → Navigiert zur Live-View
 - Empty State + Loading State
 
-### Issue #11: LinkedIn Engine — NEXT (Deep Research zuerst)
+### Issue #11: LinkedIn Engine ✅
+**Commit:** `ceb3832`
+**Deep Research:** 6 parallele Agents zu LinkedIn-Psychologie, 360Brew-Algorithmus, professionelle Personas, Metriken, bilaterale Graph-Dynamik, Code-Patterns.
 
-**Running total: 168 Tests, 0 Lint-Fehler**
+Was gebaut wurde:
+- ProfessionalProfile Model (Seniority, Company, Expertise, Compliance)
+- ProfessionalNetworkPlatform: 13 Actions (6 Reactions, Articles, Shares, Connect)
+- Feed-Scoring: Expertise-Alignment, Virality-Suppression, Format-Multiplier
+- Double-dampened Engagement (LinkedIn unterdrückt Viralität bewusst)
+- Professional Rules Prompt ("Chef liest mit", substanzielle Kommentare)
+- Engine Platform-Factory (wählt Public/Professional basierend auf Config)
+- Undirected Graph für bilaterale Connections verifiziert — 19 Tests
+
+**Running total: 187 Tests, 0 Lint-Fehler**
+
+**Issues #12-#14 (Billing, Landing, Scaling) → Später — Kern-Plattform ist komplett**
 
 ---
 
