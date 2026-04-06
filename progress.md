@@ -126,6 +126,32 @@ Was gebaut wurde:
 
 **Running total: 187 Tests, 0 Lint-Fehler**
 
+### E2E Testing & Debugging Session ✅
+
+**E2E Test v1 (mit echtem GPT-4o-mini):**
+- Fand 3 kritische Bugs:
+  1. Seed-Posts nicht injiziert → Agents sahen leeren Feed
+  2. Szenario-Kontext nicht im System-Prompt → Posts waren generisch
+  3. Creator Chicken-and-egg → kein Feed = kein Post = kein Feed
+- Alle 3 gefixt
+
+**E2E Test v2 (nach Fixes):**
+- 12 Agents, 5 Runden, SwissBank-Krise
+- 3 szenariobezogene Posts + 22 Kommentare ✅
+- Narrative erkannt: "SwissBank", "Entlassungen", "Zukunftsfähigkeit" ✅
+- Executive Summary auf Deutsch generiert ✅
+- Kosten: $0.0040
+
+**Frontend Live-Test:**
+- Login → Dashboard → Neue Simulation → Analyse → Review ✅
+- NewSimulationPage: Wizard mit Freitext → LLM-Analyse → Parameter → Start
+- Plattform-Toggle (Öffentlich/Professionell) funktioniert
+- Seed-Post-Preview im Review-Screen
+
+**Verbleibende Issues:**
+- Sentiment-Werte sind immer 0.0 (Berechnung fehlt)
+- Quality Badge daher immer RED (Entropy = 0)
+
 **Issues #12-#14 (Billing, Landing, Scaling) → Später — Kern-Plattform ist komplett**
 
 ---
