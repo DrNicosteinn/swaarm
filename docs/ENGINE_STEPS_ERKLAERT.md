@@ -607,3 +607,190 @@ Kunde gibt Szenario ein
        ↓
 Kunde sieht Dashboard + kann PDF exportieren
 ```
+
+---
+
+## Issue #5: Persona Generator
+
+**Datei:** `backend/app/simulation/personas.py`
+**Tests:** 14
+
+### Was wurde gebaut?
+
+Das Modul das hunderte realistische, DACH-kalibrierte Personas erzeugt — die "Schauspieler" der Simulation.
+
+### Die Pipeline (5 Phasen)
+
+**Phase 1: Stakeholder-Mix bestimmen**
+
+Je nach Szenario-Typ wird automatisch festgelegt welche Stakeholder-Gruppen in welchem Verhältnis vertreten sind. Vordefinierte Templates:
+
+- **Unternehmenskrise:** 15% Mitarbeiter, 25% Kunden, 5% Medien, 35% Öffentlichkeit, etc.
+- **Produktlaunch:** 35% Zielkunden, 20% Bestandskunden, 10% Influencer, etc.
+- **Employer Branding:** 25% Mitarbeiter, 20% Jobsuchende, 10% HR-Profis, etc.
+
+Das Template bestimmt z.B. bei 500 Personas: 75 Mitarbeiter, 125 Kunden, 25 Medien, usw.
+
+**Phase 2: Batch-Generierung via LLM**
+
+Die Personas werden in Batches von je 10 via GPT-4o-mini generiert. Der Prompt enthält:
+- Die Stakeholder-Rolle für diesen Batch
+- Das Szenario als Kontext
+- Namen der letzten 5 bereits generierten Personas (damit keine Duplikate entstehen)
+- Anweisung für DACH-spezifische Namen und kulturelle Vielfalt
+
+Jede Persona kommt als JSON mit ~20 Feldern zurück: Name, Alter, Geschlecht, Land, Region, Beruf, Branche, Big Five, Posting-Stil, Meinungen, Interessen, Bio.
+
+**Kosten:** ~50 Batches × ~2000 Tokens = ~$0.07 für 500 Personas.
+
+**Phase 3: Tier-Zuweisung**
+
+Basierend auf der Kontroversität des Szenarios werden die Tiers zugewiesen:
+- Krise: 10% Power Creator, 40% Active Responder, 30% Selective Engager, 20% Observer
+- Standard: 5/25/20/50
+- Routine: 3/12/15/70
+
+Die Zuweisung ist randomisiert — nicht alle Mitarbeiter werden automatisch Power Creator.
+
+**Phase 4: Spezial-Flags**
+
+7% der Personas werden als "Zealots" markiert (Meinung ändert sich nie), 5% als "Contrarians" (widersprechen der Mehrheit). Diese Flags werden zufällig verteilt, mit der Einschränkung dass keine Persona beides gleichzeitig sein kann.
+
+**Phase 5: Skalierung via Parametrische Variation**
+
+Wenn mehr als 500 Personas gebraucht werden, werden Varianten erstellt:
+- Alter: ±5 Jahre
+- Big Five: Gaussches Rauschen mit std=0.08
+- Meinungen: Gaussches Rauschen mit std=0.10
+- 20% Chance: Posting-Frequenz ändert sich
+- 15% Chance: Tonalität ändert sich
+- Name bleibt gleich (Varianten sind "ähnliche Personen"), aber ID ist einzigartig
+
+So werden aus 500 Basis-Personas z.B. 10'000 oder 50'000 — ohne zusätzliche LLM-Kosten.
+
+### Fallback ohne LLM
+
+Wenn ein LLM-Batch fehlschlägt (API-Error, Rate Limit), werden Fallback-Personas generiert:
+- Zufälliges Land (DE/CH/AT) + Region
+- Alter nach DACH-Altersverteilung
+- Big Five nach realistischer Normalverteilung (basierend auf Forschung)
+- Generischer Name ("Agent abc123")
+
+Das verhindert dass die Persona-Generierung die ganze Simulation blockiert.
+
+---
+
+## Issue #6: Prompt Builder
+
+**Datei:** `backend/app/services/prompt_builder.py`, `backend/app/api/simulation.py`
+**Tests:** 11
+
+### Was wurde gebaut?
+
+Der "intelligente Eingabeassistent" der den Freitext des Kunden in eine strukturierte Simulation verwandelt.
+
+### Wie es funktioniert
+
+**Schritt 1: Freitext-Analyse**
+
+Der Kunde gibt z.B. ein: *"SwissBank kündigt Entlassung von 200 Mitarbeitern an. Statement: Die Restrukturierung ist notwendig für die Zukunftsfähigkeit."*
+
+Das LLM (GPT-4o-mini, Temperature 0.3 für konsistente Extraktion) analysiert den Text und gibt ein `StructuredScenario` JSON zurück:
+
+```json
+{
+  "industry": "Finanzwesen",
+  "company": "SwissBank",
+  "target_audience": "Kunden und Mitarbeiter",
+  "market": "CH",
+  "statement": "Die Restrukturierung ist notwendig...",
+  "scenario_type": "corporate_crisis",
+  "controversity_score": 0.8,
+  "missing_fields": ["Tonfall des Statements"],
+  "suggestions": ["Definiere den gewünschten Tonfall"],
+  "seed_posts": [
+    "SwissBank: 'Die Restrukturierung ist notwendig...'",
+    "@FinanzReporter: SwissBank streicht 200 Stellen.",
+    "@BetroffeneMitarbeiterin: Gerade erfahren. Bin schockiert."
+  ]
+}
+```
+
+**Schritt 2: Lücken identifizieren**
+
+Das LLM erkennt was fehlt — z.B. "Welcher Tonfall?", "Gibt es eine Vorgeschichte?", "Wer sind die Hauptkritiker?". Diese werden dem Kunden als Vorschläge angezeigt.
+
+**Schritt 3: Seed-Posts generieren**
+
+Das ist kritisch: Die Simulation braucht "Auslöser-Posts" damit die Agents etwas haben worauf sie reagieren. Das LLM generiert 2-3 realistische Posts:
+1. Das offizielle Statement der Firma
+2. Eine erste Medien-Reaktion
+3. Eine erste persönliche Reaktion
+
+Diese Seed-Posts werden als erste Posts in die Simulation injiziert (in Runde 0).
+
+**Schritt 4: Kontroversitäts-Score**
+
+Das LLM schätzt wie kontrovers das Szenario ist (0.0-1.0):
+- 0.0-0.3 = Routine (Thought Leadership, normaler Content)
+- 0.3-0.6 = Standard (Produktlaunch, moderate Ankündigung)
+- 0.6-1.0 = Krise (Entlassungen, Skandal, politisch brisant)
+
+Dieser Score bestimmt direkt die Tier-Verteilung der Personas und damit wie viele Agents aktiv sind.
+
+### API-Endpoints
+
+- `POST /api/simulation/analyze-input` — Freitext analysieren
+- `POST /api/simulation/suggest-improvements` — Verbesserungsvorschläge generieren
+
+Beide Endpoints sind geschützt (JWT-Auth required).
+
+### Schwierigkeit beim Testen
+
+Das Mock-LLM für Tests musste sorgfältig gebaut werden: Der ANALYSIS_PROMPT enthielt das Wort "fehlt noch", was den Mock dazu brachte den falschen Branch (Improvement statt Analysis) zu wählen. Fix: Mock prüft jetzt auf "Kommunikationsexperte" (unique zum Improvement-Prompt) statt auf generische Wörter.
+
+---
+
+## Issue #7: Background Jobs & Simulation Service
+
+**Datei:** `backend/app/services/simulation_service.py`, `backend/app/api/simulation.py` (erweitert)
+**Tests:** Keine eigenen (getestet via bestehende + API-Endpoints)
+
+### Was wurde gebaut?
+
+Der "Simulation Service" der alle bisherigen Module zu einem End-to-End-Flow verbindet, plus Background-Job-Ausführung.
+
+### Der SimulationService
+
+`run_simulation_job()` ist die Funktion die den kompletten Ablauf orchestriert:
+
+1. **LLM Provider erstellen** (OpenAI mit API Key aus .env)
+2. **Kontroversität bestimmen** (aus dem Prompt Builder Score)
+3. **Personas generieren** (PersonaGenerator mit Stakeholder-Mix)
+4. **SimulationConfig zusammenbauen** (Agent-Count, Runden, Plattform, etc.)
+5. **Simulation starten** (create_and_run_simulation aus engine.py)
+6. **Ergebnis zurückgeben**
+
+### Background-Ausführung
+
+Simulationen dauern Minuten bis Stunden — der API-Request kann nicht so lange offen bleiben. Lösung: FastAPI `BackgroundTasks`.
+
+Ablauf:
+1. User ruft `POST /api/simulation/start` auf
+2. Server erstellt eine Simulation-ID und gibt sie sofort zurück
+3. Die eigentliche Simulation läuft als Background-Task
+4. User pollt `GET /api/simulation/status/{id}` für Updates
+
+**Aktueller Stand:** In-Memory Job-Tracking (ein Dictionary). In Produktion wird das auf Supabase (PostgreSQL) migriert, damit Jobs Server-Neustarts überleben. Für den MVP reicht die In-Memory-Lösung.
+
+### Neue API-Endpoints
+
+- `POST /api/simulation/start` — Startet Simulation im Hintergrund
+- `GET /api/simulation/status/{id}` — Status einer Simulation (pending/running/completed/failed)
+- `GET /api/simulation/list` — Alle Simulationen des Users
+
+Alle Endpoints prüfen die User-ID — ein User sieht nur seine eigenen Simulationen.
+
+### Warum noch kein ARQ/Redis?
+
+ARQ (die Redis-basierte Job Queue aus dem Bauplan) hätte eine Redis-Instanz erfordert. Für den MVP nutzen wir FastAPI's eingebaute BackgroundTasks — einfacher, keine zusätzliche Infrastruktur. ARQ wird für Produktion nachgerüstet wenn wir mehrere Worker und Job-Persistenz brauchen.
