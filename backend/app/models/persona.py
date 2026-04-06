@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.models.professional import ProfessionalProfile
+
 
 class AgentTier(StrEnum):
     """Agent activity tier based on scenario-driven distribution."""
@@ -79,10 +81,8 @@ class Persona(BaseModel):
     # Bio for LLM prompt
     bio: str = ""
 
-    # Professional network specific (optional)
-    job_title: str | None = None
-    company_size: str | None = None
-    expertise_topics: list[str] = Field(default_factory=list)
+    # Professional network specific (optional, populated for LinkedIn simulation)
+    professional_profile: ProfessionalProfile | None = None
 
     # Flags
     is_zealot: bool = False  # Opinion never changes

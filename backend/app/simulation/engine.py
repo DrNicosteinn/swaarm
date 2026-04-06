@@ -483,6 +483,7 @@ async def create_and_run_simulation(
 
     Creates the DB, graph, platform, and engine, then runs the simulation.
     """
+    from app.models.simulation import PlatformType
     from app.simulation.platforms.public import PublicNetworkPlatform
 
     # Create simulation DB
@@ -494,8 +495,13 @@ async def create_and_run_simulation(
     graph = SocialGraph(config.platform)
     graph.initialize(personas, seed=config.seed)
 
-    # Create platform
-    platform = PublicNetworkPlatform(db, graph)
+    # Create platform based on config
+    if config.platform == PlatformType.PROFESSIONAL:
+        from app.simulation.platforms.professional import ProfessionalNetworkPlatform
+
+        platform = ProfessionalNetworkPlatform(db, graph)
+    else:
+        platform = PublicNetworkPlatform(db, graph)
 
     # Insert personas into DB
     users = [(p.id, p.name, p.model_dump_json(), "{}") for p in personas]
