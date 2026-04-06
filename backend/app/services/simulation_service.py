@@ -1,10 +1,11 @@
 """Simulation service — orchestrates the full simulation lifecycle.
 
 Connects Prompt Builder → Persona Generator → Simulation Engine.
-Manages simulation records in Supabase and triggers background jobs.
+Reports progress via callback for live status updates.
 """
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from loguru import logger
@@ -23,6 +24,8 @@ from app.models.simulation import (
 from app.services.prompt_builder import PromptBuilder, StructuredScenario
 from app.simulation.engine import create_and_run_simulation
 from app.simulation.personas import PersonaGenerationConfig, PersonaGenerator
+
+ProgressCallback = Callable[..., None]
 
 
 class SimulationRequest(BaseModel):
@@ -56,13 +59,15 @@ async def run_simulation_job(
     user_id: str,
     request: SimulationRequest,
     simulation_id: str | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> SimulationResult:
-    """Run a complete simulation end-to-end.
-
-    This is the function that ARQ calls as a background job.
-    """
+    """Run a complete simulation end-to-end with progress reporting."""
     if not simulation_id:
         simulation_id = f"sim-{uuid.uuid4().hex[:12]}"
+
+    def report(**kwargs):
+        if progress_callback:
+            progress_callback(**kwargs)
 
     logger.info(
         f"Starting simulation {simulation_id} for user {user_id}: "
@@ -70,17 +75,23 @@ async def run_simulation_job(
         f"platform={request.platform.value}"
     )
 
-    # Create LLM provider
+    # Phase 1: Setup
+    report(phase="initializing", phase_detail="LLM-Provider wird erstellt...")
     llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
     usage = LLMUsageTracker(model=settings.swaarm_llm_model)
 
-    # Determine controversity level from scenario
     builder = PromptBuilder(llm)
     controversity_level = builder.get_controversity_level(request.scenario.controversity_score)
     controversity = ScenarioControversity(controversity_level)
 
-    # Generate personas
+    # Phase 2: Persona Generation
+    report(
+        phase="generating_personas",
+        phase_detail=f"Generiere {request.agent_count} Personas...",
+        personas_generated=0,
+    )
     logger.info(f"Generating personas for simulation {simulation_id}...")
+
     persona_gen = PersonaGenerator(llm, usage_tracker=usage)
     persona_config = PersonaGenerationConfig(
         scenario_text=request.scenario.statement or request.scenario.context,
@@ -91,8 +102,20 @@ async def run_simulation_job(
         seed=42,
     )
     personas = await persona_gen.generate(persona_config)
+    report(
+        phase="generating_personas",
+        phase_detail=f"{len(personas)} Personas generiert",
+        personas_generated=len(personas),
+    )
 
-    # Build simulation config
+    # Phase 3: Simulation
+    report(
+        phase="simulating",
+        phase_detail="Simulation startet...",
+        current_round=0,
+    )
+    logger.info(f"Running simulation {simulation_id}...")
+
     sim_config = SimulationConfig(
         simulation_id=simulation_id,
         user_id=user_id,
@@ -105,13 +128,33 @@ async def run_simulation_job(
         seed=42,
     )
 
-    # Run simulation with seed posts from prompt builder
-    logger.info(f"Running simulation {simulation_id}...")
+    # Event callback that updates progress per round
+    async def on_sim_event(event):
+        if event.event_type == "round_complete":
+            d = event.data
+            report(
+                phase="simulating",
+                phase_detail=f"Runde {event.round}/{request.round_count}",
+                current_round=event.round,
+                posts_created=d.get("posts_created", 0),
+                avg_sentiment=d.get("avg_sentiment", 0.0),
+                cost_usd=usage.total_cost_usd,
+            )
+
     result = await create_and_run_simulation(
         config=sim_config,
         personas=personas,
         llm=llm,
+        event_callback=on_sim_event,
         seed_posts=request.scenario.seed_posts or None,
+    )
+
+    # Phase 4: Done
+    report(
+        phase="done",
+        phase_detail="Simulation abgeschlossen",
+        current_round=result.completed_rounds,
+        cost_usd=result.total_cost_usd,
     )
 
     logger.info(
