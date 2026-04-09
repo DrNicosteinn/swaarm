@@ -31,7 +31,7 @@ class OpenAIProvider(LLMProvider):
         base_delay: float = 1.0,
         max_delay: float = 60.0,
     ):
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key, timeout=300.0)
         self.model = model
         self.max_retries = max_retries
         self.base_delay = base_delay
@@ -53,8 +53,13 @@ class OpenAIProvider(LLMProvider):
                     "model": self.model,
                     "messages": messages,
                     "temperature": temperature,
-                    "max_tokens": max_tokens,
                 }
+
+                # GPT-5.x and o-series models use max_completion_tokens instead of max_tokens
+                if self.model.startswith(("gpt-5", "o1", "o3", "o4")):
+                    kwargs["max_completion_tokens"] = max_tokens
+                else:
+                    kwargs["max_tokens"] = max_tokens
 
                 if tools:
                     kwargs["tools"] = tools

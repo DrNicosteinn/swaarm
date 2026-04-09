@@ -113,9 +113,7 @@ class ReportGenerator:
         # Build timeline data
         sentiment_timeline = [m.avg_sentiment for m in round_metrics]
         posts_per_round = [m.posts_created for m in round_metrics]
-        engagement_per_round = [
-            m.posts_created + m.comments_created + m.likes_given for m in round_metrics
-        ]
+        engagement_per_round = [m.posts_created + m.comments_created + m.likes_given for m in round_metrics]
 
         # Compute totals
         total_posts = sum(m.posts_created for m in round_metrics)
@@ -196,11 +194,51 @@ class ReportGenerator:
         post_by_word: dict[str, list[str]] = {}
 
         stopwords = {
-            "die", "der", "das", "und", "ist", "in", "von", "zu", "für", "mit",
-            "auf", "ein", "eine", "es", "nicht", "sich", "den", "auch", "ich",
-            "an", "des", "als", "hat", "wie", "bei", "man", "noch", "so",
-            "dass", "aber", "nach", "wird", "wir", "sie", "er", "was", "kann",
-            "aus", "über", "nur", "sind", "haben", "wurde", "dem", "schon",
+            "die",
+            "der",
+            "das",
+            "und",
+            "ist",
+            "in",
+            "von",
+            "zu",
+            "für",
+            "mit",
+            "auf",
+            "ein",
+            "eine",
+            "es",
+            "nicht",
+            "sich",
+            "den",
+            "auch",
+            "ich",
+            "an",
+            "des",
+            "als",
+            "hat",
+            "wie",
+            "bei",
+            "man",
+            "noch",
+            "so",
+            "dass",
+            "aber",
+            "nach",
+            "wird",
+            "wir",
+            "sie",
+            "er",
+            "was",
+            "kann",
+            "aus",
+            "über",
+            "nur",
+            "sind",
+            "haben",
+            "wurde",
+            "dem",
+            "schon",
         }
 
         for post in posts:
@@ -222,12 +260,14 @@ class ReportGenerator:
         for word, count in sorted_words[:5]:
             if count < 2:
                 break
-            narratives.append(NarrativeItem(
-                label=word.capitalize(),
-                post_count=count,
-                sentiment=0.0,  # Would need sentiment analysis
-                representative_posts=post_by_word.get(word, [])[:3],
-            ))
+            narratives.append(
+                NarrativeItem(
+                    label=word.capitalize(),
+                    post_count=count,
+                    sentiment=0.0,  # Would need sentiment analysis
+                    representative_posts=post_by_word.get(word, [])[:3],
+                )
+            )
 
         return narratives
 
@@ -241,34 +281,39 @@ class ReportGenerator:
         for i in range(1, len(sentiment_timeline)):
             drop = sentiment_timeline[i - 1] - sentiment_timeline[i]
             if drop > 0.3:
-                risks.append(RiskItem(
-                    level="hoch",
-                    description=(
-                        f"Stimmungseinbruch in Runde {i + 1}: "
-                        f"Sentiment fiel um {drop:.2f} Punkte"
-                    ),
-                    round_detected=i + 1,
-                ))
+                risks.append(
+                    RiskItem(
+                        level="hoch",
+                        description=(
+                            f"Stimmungseinbruch in Runde {i + 1}: Sentiment fiel um {drop:.2f} Punkte"
+                        ),
+                        round_detected=i + 1,
+                    )
+                )
 
         # Risk: Very negative overall sentiment
         if sentiment_timeline:
             avg = sum(sentiment_timeline) / len(sentiment_timeline)
             if avg < -0.3:
-                risks.append(RiskItem(
-                    level="hoch",
-                    description=f"Durchgehend negatives Sentiment (Durchschnitt: {avg:.2f})",
-                ))
+                risks.append(
+                    RiskItem(
+                        level="hoch",
+                        description=f"Durchgehend negatives Sentiment (Durchschnitt: {avg:.2f})",
+                    )
+                )
 
         # Risk: High error rate
         for m in round_metrics:
             if m.error_count > 0 and m.active_agents > 0:
                 error_rate = m.error_count / m.active_agents
                 if error_rate > 0.1:
-                    risks.append(RiskItem(
-                        level="mittel",
-                        description=f"Hohe Fehlerrate in Runde {m.round_number} ({error_rate:.0%})",
-                        round_detected=m.round_number,
-                    ))
+                    risks.append(
+                        RiskItem(
+                            level="mittel",
+                            description=f"Hohe Fehlerrate in Runde {m.round_number} ({error_rate:.0%})",
+                            round_detected=m.round_number,
+                        )
+                    )
 
         return risks[:10]  # Max 10 risks
 

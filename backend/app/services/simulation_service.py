@@ -27,9 +27,11 @@ from app.models.simulation import (
     SimulationStatus,
 )
 from app.services.entity_enricher import EntityEnricher, EnrichmentResult
+from app.services.persona_orchestrator import PersonaOrchestrator, PersonaPlan, PlannedPersona
 from app.services.prompt_builder import PromptBuilder, StructuredScenario
 from app.services.smart_decision import (
     EnrichmentDecision,
+    ExtractedEntity,
     SmartDecisionEngine,
     SimulationDecision,
 )
@@ -324,6 +326,12 @@ _ENTITY_TYPE_COLORS = {
 }
 
 
+async def _broadcast(ws_broadcast: WsBroadcast | None, event_type: str, data: dict) -> None:
+    """Helper to broadcast a WebSocket event."""
+    if ws_broadcast:
+        await ws_broadcast(json.dumps({"type": event_type, "data": data}))
+
+
 async def run_quick_start_job(
     user_id: str,
     input_text: str,
@@ -331,10 +339,10 @@ async def run_quick_start_job(
     progress_callback: ProgressCallback | None = None,
     ws_broadcast: WsBroadcast | None = None,
 ) -> None:
-    """Entity-pipeline flow: analyze → extract entities → enrich → generate personas.
+    """Orchestrator-driven pipeline: analyze → enrich → orchestrate → generate → validate.
 
-    After persona generation, the job pauses. The simulation itself
-    starts when run_simulation_phase() is called via the /configure endpoint.
+    Uses GPT-5.4 for intelligent persona planning, GPT-4o-mini for individual generation.
+    After persona generation, the job pauses for user configuration (platform + rounds).
     """
 
     def report(**kwargs):
@@ -343,22 +351,19 @@ async def run_quick_start_job(
 
     logger.info(f"Quick-start {simulation_id} for user {user_id}")
 
-    llm = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
+    llm_fast = OpenAIProvider(api_key=settings.openai_api_key, model=settings.swaarm_llm_model)
+    llm_orchestrator = OpenAIProvider(
+        api_key=settings.openai_api_key, model=settings.swaarm_orchestrator_model
+    )
     usage = LLMUsageTracker(model=settings.swaarm_llm_model)
 
     # ── Phase 1: Smart Decision (analyze + entity extraction) ──
     report(phase="analyzing", phase_detail="Analysiere Fragestellung...")
-    if ws_broadcast:
-        await ws_broadcast(
-            json.dumps(
-                {
-                    "type": "phase_changed",
-                    "data": {"phase": "analyzing", "detail": "Analysiere Fragestellung..."},
-                }
-            )
-        )
+    await _broadcast(
+        ws_broadcast, "phase_changed", {"phase": "analyzing", "detail": "Analysiere Fragestellung..."}
+    )
 
-    engine = SmartDecisionEngine(llm, usage_tracker=usage)
+    engine = SmartDecisionEngine(llm_fast, usage_tracker=usage)
     decision = await engine.analyze(input_text)
     logger.info(f"Smart decision: {decision.simulation_type}, {len(decision.entities)} entities")
 
@@ -449,7 +454,7 @@ async def run_quick_start_job(
                 )
             )
 
-        enricher = EntityEnricher(llm, usage_tracker=usage)
+        enricher = EntityEnricher(llm_fast, usage_tracker=usage)
         _enriched_count = 0
 
         async def on_enrichment_progress(result: EnrichmentResult):
@@ -497,143 +502,344 @@ async def run_quick_start_job(
             f"Enrichment complete: {sum(1 for r in enrichment_results if r.success)}/{len(enrichment_results)} successful"
         )
 
-    # ── Phase 4: Persona Generation ──
+    # ── Phase 4: Orchestrator — plan persona ecosystem (GPT-5.4) ──
+    target_count = decision.persona_strategy.total or settings.default_agent_count
+    # Orchestrator plans ~50 core personas (detailed with relationships).
+    # The rest will be scaled parametrically from these core personas.
+    orchestrator_count = min(25, target_count)
     report(
         phase="generating_personas",
-        phase_detail="Generiere Personas...",
+        phase_detail="Plane Persona-Oekosystem...",
         personas_generated=0,
+        total_agents=target_count,
     )
-    if ws_broadcast:
-        await ws_broadcast(
-            json.dumps(
-                {
-                    "type": "phase_changed",
-                    "data": {"phase": "generating_personas", "detail": "Generiere Personas..."},
-                }
-            )
+    await _broadcast(
+        ws_broadcast,
+        "phase_changed",
+        {
+            "phase": "generating_personas",
+            "detail": f"Plane {orchestrator_count} Kern-Personas mit GPT-5.4...",
+        },
+    )
+
+    orchestrator = PersonaOrchestrator(llm_orchestrator, llm_fast, usage_tracker=usage)
+    plan = await orchestrator.plan_personas(
+        decision=decision,
+        enrichment_results=enrichment_results,
+        scenario_text=input_text,
+        target_count=orchestrator_count,
+    )
+
+    logger.info(
+        f"Orchestrator planned {len(plan.personas)} personas, "
+        f"{len(plan.new_entities_to_research)} new entities to research"
+    )
+
+    # ── Phase 4b: Research newly discovered entities ──
+    if plan.new_entities_to_research:
+        new_count = len(plan.new_entities_to_research)
+        report(phase="enriching", phase_detail=f"Recherchiere {new_count} weitere Entitaeten...")
+        await _broadcast(
+            ws_broadcast,
+            "phase_changed",
+            {
+                "phase": "enriching",
+                "detail": f"Recherchiere {new_count} weitere Entitaeten...",
+            },
         )
 
-    # Build scenario context from decision
-    builder = PromptBuilder(llm)
+        # Convert to ExtractedEntity for the enricher
+        new_entities_for_enrichment = []
+        for ne in plan.new_entities_to_research:
+            from app.services.smart_decision import EntityType, EnrichmentDecision as ED
+
+            entity = ExtractedEntity(
+                name=ne.name,
+                entity_type=EntityType(ne.entity_type)
+                if ne.entity_type in EntityType.__members__.values()
+                else EntityType.REAL_COMPANY,
+                importance=0.7,
+                role_in_scenario=ne.reason,
+                enrichment=ED.ENRICH,
+                sub_type=ne.sub_type,
+            )
+            new_entities_for_enrichment.append(entity)
+
+            # Add entity node to graph
+            new_eid = f"entity-{uuid.uuid4().hex[:8]}"
+            entity_name_to_id[ne.name] = new_eid
+            await _broadcast(
+                ws_broadcast,
+                "entity_extracted",
+                {
+                    "node": {
+                        "id": new_eid,
+                        "label": ne.name,
+                        "communityId": 0,
+                        "sentiment": 0.0,
+                        "followerCount": 350,
+                        "tier": "power_creator",
+                        "role": ne.reason,
+                        "occupation": ne.sub_type,
+                        "entityType": ne.entity_type,
+                        "subType": ne.sub_type,
+                        "personaSource": "real_enriched",
+                        "isEntity": True,
+                        "importance": 0.7,
+                    },
+                    "links": [],
+                },
+            )
+            await asyncio.sleep(0.2)
+
+        # Enrich the new entities
+        enricher2 = EntityEnricher(llm_fast, usage_tracker=usage)
+
+        async def on_new_enrichment(result: EnrichmentResult):
+            eid = entity_name_to_id.get(result.entity_name, "")
+            if result.success:
+                await _broadcast(
+                    ws_broadcast,
+                    "entity_enriched",
+                    {
+                        "entity_name": result.entity_name,
+                        "node": {
+                            "id": eid,
+                            "label": result.verified_name or result.entity_name,
+                            "occupation": result.verified_title or "",
+                        },
+                    },
+                )
+            else:
+                await _broadcast(
+                    ws_broadcast,
+                    "enrichment_failed",
+                    {
+                        "entity_name": result.entity_name,
+                        "reason": "Recherche fehlgeschlagen",
+                    },
+                )
+
+        new_enrichment_results = await enricher2.enrich_batch(
+            new_entities_for_enrichment,
+            scenario_context=input_text,
+            on_progress=on_new_enrichment,
+            max_concurrent=3,
+        )
+        enrichment_results.extend(new_enrichment_results)
+
+    # ── Phase 4c: Validate and refine the plan (GPT-5.4) ──
+    report(phase="generating_personas", phase_detail="Validiere Beziehungen...")
+    plan = await orchestrator.validate_and_refine(plan, input_text)
+
+    # ── Phase 5: Generate actual Persona objects from the plan ──
+    report(phase="generating_personas", phase_detail=f"Generiere {len(plan.personas)} Personas...")
+
+    builder = PromptBuilder(llm_fast)
     scenario = await builder.analyze_input(input_text)
     controversity_level = builder.get_controversity_level(scenario.controversity_score)
     controversity = ScenarioControversity(controversity_level)
 
-    persona_gen = PersonaGenerator(llm, usage_tracker=usage)
-    persona_config = PersonaGenerationConfig(
-        scenario_text=input_text,
-        scenario_type=decision.scenario_type,
-        target_count=decision.persona_strategy.total or settings.default_agent_count,
-        base_persona_count=min(500, decision.persona_strategy.total or settings.default_agent_count),
-        controversity=controversity,
-        seed=42,
-        company=scenario.company or "",
-        industry=scenario.industry or "",
-    )
+    # Build enrichment map for persona generation
+    enrichment_map = {r.entity_name: r for r in enrichment_results if r.success}
 
-    # Role sentiment + follower mapping (reused from original flow)
-    _role_sentiment = {
-        "employees": -0.4,
-        "customers": -0.2,
-        "media": -0.1,
-        "competitors": 0.1,
-        "regulators": 0.0,
-        "investors": -0.3,
-        "general_public": -0.1,
-        "activists": -0.6,
-        "politicians": -0.3,
-    }
-    _tier_followers = {
-        "power_creator": 400,
-        "active_responder": 120,
-        "selective_engager": 50,
-        "observer": 15,
-    }
-    _role_to_community: dict[str, int] = {}
-    _community_counter = len(decision.entities)  # Start after entity communities
-    _sent_node_ids: set[str] = set()
+    # Generate each persona from the plan using fast LLM
+    from app.simulation.personas import PersonaGenerator, PersonaGenerationConfig, SINGLE_PERSONA_PROMPT
+    from app.models.persona import Persona, PersonaSource, BigFive, PostingStyle, OpinionSeeds, AgentTier
+    from app.models.simulation import TierDistribution
+    import random
 
-    def on_persona_progress(count: int):
+    persona_gen = PersonaGenerator(llm_fast, usage_tracker=usage)
+    all_personas: list[Persona] = []
+    persona_id_map: dict[str, str] = {}  # planned name → persona ID
+
+    # Tier + follower mappings for visualization
+    _tier_followers = {"power_creator": 400, "active_responder": 120, "selective_engager": 50, "observer": 15}
+
+    # Assign community IDs based on linked_entity
+    _entity_to_community: dict[str, int] = {}
+    _community_counter = 0
+    for p in plan.personas:
+        ent = p.linked_entity
+        if ent and ent not in _entity_to_community:
+            _entity_to_community[ent] = _community_counter
+            _community_counter += 1
+    # Fallback community for unlinked
+    _entity_to_community[""] = _community_counter
+
+    _generated_count = 0
+    _sem = asyncio.Semaphore(4)
+
+    async def _generate_one(planned: PlannedPersona) -> Persona:
+        """Generate one Persona from a PlannedPersona via LLM."""
+        nonlocal _generated_count
+
+        async with _sem:
+            # If this persona needs enrichment, check if we have data
+            enrichment = enrichment_map.get(planned.linked_entity) or enrichment_map.get(planned.name)
+
+            entry = {
+                "name": planned.name,
+                "role": planned.role,
+                "occupation": planned.occupation,
+                "age": planned.age,
+                "gender": planned.gender,
+            }
+            persona = await persona_gen._generate_single_persona(entry, input_text, _generated_count)
+
+            # Set source and entity link
+            if planned.persona_type == "real_enriched" and enrichment:
+                persona.persona_source = PersonaSource.REAL_ENRICHED
+                persona.enrichment_sources = ["web_search"]
+            elif planned.persona_type == "real_enriched":
+                persona.persona_source = PersonaSource.REAL_MINIMAL
+                persona.enrichment_sources = ["document"]
+            elif planned.persona_type == "role_based":
+                persona.persona_source = PersonaSource.ROLE_BASED
+            else:
+                persona.persona_source = PersonaSource.GENERATED
+
+            persona.source_entity_name = planned.linked_entity
+            persona.stakeholder_role = planned.role
+
+            return persona
+
+    async def _generate_and_stream(planned: PlannedPersona) -> None:
+        nonlocal _generated_count
+        persona = await _generate_one(planned)
+        persona_id_map[planned.name] = persona.id
+        all_personas.append(persona)
+        _generated_count += 1
+
         report(
             phase="generating_personas",
-            phase_detail=f"{count} Personas generiert...",
-            personas_generated=count,
+            phase_detail=f"{_generated_count}/{len(plan.personas)} Personas...",
+            personas_generated=_generated_count,
         )
 
-    async def on_persona_batch(new_personas: list) -> None:
-        nonlocal _community_counter
-        if not ws_broadcast:
-            return
+        # Stream to frontend
+        tier_str = persona.agent_tier.value if persona.agent_tier else "observer"
+        community_id = _entity_to_community.get(planned.linked_entity, _entity_to_community[""])
+        base_followers = _tier_followers.get(tier_str, 15)
+        followers = max(5, int(base_followers * _rnd.uniform(0.5, 1.5)))
 
-        new_nodes = []
-        new_links = []
-        for p in new_personas:
-            if p.id not in _sent_node_ids:
-                _sent_node_ids.add(p.id)
-                tier_str = p.agent_tier.value if p.agent_tier else "observer"
-                role = p.stakeholder_role or "general"
-                if role not in _role_to_community:
-                    _role_to_community[role] = _community_counter
-                    _community_counter += 1
+        node = {
+            "id": persona.id,
+            "label": persona.name,
+            "communityId": community_id,
+            "sentiment": round(planned.sentiment_bias + _rnd.uniform(-0.15, 0.15), 2),
+            "followerCount": followers,
+            "tier": tier_str,
+            "role": planned.role,
+            "occupation": persona.occupation or planned.occupation,
+            "personaSource": persona.persona_source.value,
+            "isEntity": False,
+        }
 
-                base_sentiment = _role_sentiment.get(role, 0.0)
-                sentiment = max(-1, min(1, base_sentiment + _rnd.uniform(-0.3, 0.3)))
-                base_followers = _tier_followers.get(tier_str, 15)
-                followers = max(5, int(base_followers * _rnd.uniform(0.5, 1.5)))
+        # Link to entity
+        links = []
+        entity_id = entity_name_to_id.get(planned.linked_entity)
+        if entity_id:
+            links.append(
+                {
+                    "source": persona.id,
+                    "target": entity_id,
+                    "type": "persona_entity",
+                    "label": planned.relationship_to_entity,
+                }
+            )
 
-                new_nodes.append(
+        await _broadcast(ws_broadcast, "persona_batch", {"nodes": [node], "links": links})
+
+    # Generate all personas in parallel (4 at a time)
+    tasks = [_generate_and_stream(p) for p in plan.personas]
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    logger.info(f"Generated {len(all_personas)} core personas from orchestrator plan")
+
+    # ── Phase 5b: Scale to target count if needed ──
+    if len(all_personas) < target_count:
+        report(phase="generating_personas", phase_detail=f"Skaliere auf {target_count} Personas...")
+        rng_scale = random.Random(42)
+        scaled = persona_gen._scale_personas(all_personas, target_count, rng_scale)
+        new_scaled = scaled[len(all_personas) :]
+        all_personas = scaled
+
+        # Stream scaled personas
+        for p in new_scaled:
+            tier_str = p.agent_tier.value if p.agent_tier else "observer"
+            # Inherit community from source persona
+            community_id = _entity_to_community.get(
+                p.source_entity_name or "", _entity_to_community.get("", 0)
+            )
+            base_followers = _tier_followers.get(tier_str, 15)
+            followers = max(5, int(base_followers * _rnd.uniform(0.5, 1.5)))
+            node = {
+                "id": p.id,
+                "label": p.name,
+                "communityId": community_id,
+                "sentiment": round(_rnd.uniform(-0.5, 0.3), 2),
+                "followerCount": followers,
+                "tier": tier_str,
+                "role": p.stakeholder_role or "general",
+                "occupation": p.occupation or "",
+                "personaSource": p.persona_source.value,
+                "isEntity": False,
+            }
+            links = []
+            if p.source_entity_name and p.source_entity_name in entity_name_to_id:
+                links.append(
                     {
-                        "id": p.id,
-                        "label": p.name,
-                        "communityId": _role_to_community[role],
-                        "sentiment": round(sentiment, 2),
-                        "followerCount": followers,
-                        "tier": tier_str,
-                        "role": role,
-                        "occupation": p.occupation or "",
-                        "personaSource": p.persona_source.value
-                        if hasattr(p, "persona_source")
-                        else "generated",
-                        "isEntity": False,
+                        "source": p.id,
+                        "target": entity_name_to_id[p.source_entity_name],
+                        "type": "persona_entity",
+                        "label": "",
+                    }
+                )
+            await _broadcast(ws_broadcast, "persona_batch", {"nodes": [node], "links": links})
+
+        _generated_count = len(all_personas)
+        report(personas_generated=_generated_count)
+        logger.info(f"Scaled to {len(all_personas)} total personas")
+
+    # ── Phase 5c: Add inter-persona relationships from the plan ──
+    inter_persona_links = []
+    for planned in plan.personas:
+        src_id = persona_id_map.get(planned.name)
+        if not src_id:
+            continue
+        for rel in planned.relationships:
+            tgt_id = persona_id_map.get(rel.get("target_name", ""))
+            if tgt_id:
+                inter_persona_links.append(
+                    {
+                        "source": src_id,
+                        "target": tgt_id,
+                        "type": "persona_relation",
+                        "label": rel.get("label", ""),
                     }
                 )
 
-                # Link persona to its source entity if applicable
-                if p.source_entity_name and p.source_entity_name in entity_name_to_id:
-                    new_links.append(
-                        {
-                            "source": p.id,
-                            "target": entity_name_to_id[p.source_entity_name],
-                            "type": "persona_entity",
-                            "label": "",
-                        }
-                    )
-
-        if new_nodes:
-            await ws_broadcast(
-                json.dumps({"type": "persona_batch", "data": {"nodes": new_nodes, "links": new_links}})
-            )
-
-    all_personas = await persona_gen.generate(
-        persona_config,
-        on_progress=on_persona_progress,
-        on_batch=on_persona_batch,
-        decision=decision,
-        enrichment_results=enrichment_results,
-    )
-
-    # Build the social graph and send remaining links
+    # Build social graph and send follow-edges
     from app.simulation.graph import SocialGraph
 
     platform = PlatformType(decision.persona_strategy.recommended_platform)
+
+    # Assign tiers
+    rng = random.Random(42)
+    tier_dist = TierDistribution.for_controversity(controversity)
+    PersonaGenerator._assign_tiers(all_personas, tier_dist, rng)
+    PersonaGenerator._assign_special_flags(all_personas, rng)
+
     graph = SocialGraph(platform)
     graph.initialize(all_personas, seed=42)
 
     if ws_broadcast:
-        all_links = [{"source": u, "target": v, "type": "follow"} for u, v in graph.graph.edges()]
-        await ws_broadcast(json.dumps({"type": "persona_batch", "data": {"nodes": [], "links": all_links}}))
+        follow_links = [{"source": u, "target": v, "type": "follow"} for u, v in graph.graph.edges()]
+        all_links = inter_persona_links + follow_links
+        await _broadcast(ws_broadcast, "persona_batch", {"nodes": [], "links": all_links})
 
-    # ── Phase 5: Wait for user config ──
+    # ── Phase 6: Wait for user config ──
     total_personas = len(all_personas)
     report(
         phase="configuring",
@@ -642,20 +848,16 @@ async def run_quick_start_job(
         total_agents=total_personas,
         recommended_platform=decision.persona_strategy.recommended_platform,
     )
-    if ws_broadcast:
-        await ws_broadcast(
-            json.dumps(
-                {
-                    "type": "phase_changed",
-                    "data": {
-                        "phase": "configuring",
-                        "detail": f"{total_personas} Personas generiert. Bereit fuer Simulation.",
-                        "persona_count": total_personas,
-                        "recommended_platform": decision.persona_strategy.recommended_platform,
-                    },
-                }
-            )
-        )
+    await _broadcast(
+        ws_broadcast,
+        "phase_changed",
+        {
+            "phase": "configuring",
+            "detail": f"{total_personas} Personas generiert. Bereit fuer Simulation.",
+            "persona_count": total_personas,
+            "recommended_platform": decision.persona_strategy.recommended_platform,
+        },
+    )
 
     # Store prepared data for the simulation phase
     _prepared_simulations[simulation_id] = {

@@ -1,9 +1,16 @@
 """Social graph generation and management using networkx.
 
 Generates realistic social network graphs with:
-- Power-law degree distribution (few influencers, many normal users)
-- Community structure (interest-based clusters)
-- Weak ties between communities (Granovetter bridges)
+- Sparse, meaningful connections (avg 2-4 per agent)
+- Hub-spoke structure within communities (few connectors, many leaf nodes)
+- Community structure based on stakeholder roles
+- Sparse bridges between communities (information flow paths)
+
+Design principles (based on MiroFish/OASIS research):
+- Every edge should represent a plausible relationship
+- Max 2-3 edges for regular agents, 4-8 for hubs
+- Clear visual cluster separation with few cross-cluster bridges
+- Power-law degree distribution emerges from hub assignment, not random wiring
 """
 
 import random
@@ -14,23 +21,21 @@ from loguru import logger
 from app.models.persona import AgentTier, Persona
 from app.models.simulation import PlatformType
 
-# LFR-inspired parameters per platform
+# Platform-specific parameters
 GRAPH_PARAMS = {
     PlatformType.PUBLIC: {
-        "tau1": 2.1,  # degree distribution exponent
-        "tau2": 1.5,  # community size exponent
-        "mu": 0.15,  # mixing parameter (lower = stronger communities)
-        "average_degree_ratio": 0.008,  # avg_degree as fraction of total nodes
-        "min_degree": 2,
-        "min_community_ratio": 0.02,  # minimum community as fraction of nodes
+        "intra_hub_connections": 3,  # hub connects to N peers in its community
+        "intra_leaf_connections": 1,  # leaf connects to N peers (beyond hub)
+        "inter_bridge_ratio": 0.08,  # 8% of nodes get a cross-community bridge
+        "influencer_extra": 3,  # extra connections for power_creators
+        "min_degree": 1,
     },
     PlatformType.PROFESSIONAL: {
-        "tau1": 2.7,  # less extreme power-law for professional
-        "tau2": 1.5,
-        "mu": 0.25,  # more cross-community mixing
-        "average_degree_ratio": 0.012,
-        "min_degree": 3,
-        "min_community_ratio": 0.03,
+        "intra_hub_connections": 4,
+        "intra_leaf_connections": 2,
+        "inter_bridge_ratio": 0.12,  # more mixing in professional networks
+        "influencer_extra": 4,
+        "min_degree": 2,
     },
 }
 
@@ -56,9 +61,14 @@ class SocialGraph:
         personas: list[Persona],
         seed: int | None = None,
     ) -> None:
-        """Generate a realistic social graph from personas.
+        """Generate a sparse, meaningful social graph from personas.
 
-        Uses community-aware generation with power-law degree distribution.
+        Architecture:
+        1. Group personas by stakeholder_role → communities
+        2. Within each community: pick 1-2 hubs, connect others to hubs (star topology)
+        3. Add sparse peer connections within communities
+        4. Add sparse bridges between communities
+        5. Boost power_creator degree
         """
         rng = random.Random(seed)
         n = len(personas)
@@ -67,109 +77,132 @@ class SocialGraph:
             self._build_simple_graph(personas, rng)
             return
 
-        # Build graph with community structure
-        self._build_community_graph(personas, rng)
+        self._build_sparse_graph(personas, rng)
 
-        # Add influencer hubs (power creators get extra connections)
-        self._add_influencer_hubs(personas, rng)
-
-        # Add weak ties between communities
-        self._add_weak_ties(rng)
-
+        stats = self.get_graph_stats()
         logger.info(
-            f"Social graph initialized: {self.node_count} nodes, "
-            f"{self.edge_count} edges, "
-            f"communities: {self._count_communities()}"
+            f"Social graph initialized: {stats['nodes']} nodes, "
+            f"{stats['edges']} edges, "
+            f"avg_degree={stats['avg_degree']:.1f}, "
+            f"communities={stats['communities']}"
         )
 
     def _build_simple_graph(self, personas: list[Persona], rng: random.Random) -> None:
         """Build a simple graph for small simulations (<10 agents)."""
         for persona in personas:
-            self.graph.add_node(persona.id, community=0)
+            self.graph.add_node(persona.id, community=0, role=persona.stakeholder_role or "general")
 
         ids = [p.id for p in personas]
-        for _i, p in enumerate(personas):
-            # Each agent connects to 2-3 random others
-            n_connections = min(rng.randint(2, 3), len(ids) - 1)
+        for p in personas:
+            n_connections = min(rng.randint(1, 2), len(ids) - 1)
             targets = [t for t in ids if t != p.id]
             rng.shuffle(targets)
             for target in targets[:n_connections]:
                 self.graph.add_edge(p.id, target)
 
-    def _build_community_graph(self, personas: list[Persona], rng: random.Random) -> None:
-        """Build graph with community structure based on stakeholder roles."""
-        len(personas)
+    def _build_sparse_graph(self, personas: list[Persona], rng: random.Random) -> None:
+        """Build sparse hub-spoke graph with meaningful structure."""
+        params = GRAPH_PARAMS[self.platform]
 
-        # Group personas by stakeholder role (= communities)
+        # Step 1: Group by stakeholder role → communities
         communities: dict[str, list[Persona]] = {}
         for p in personas:
             role = p.stakeholder_role or "general"
             communities.setdefault(role, []).append(p)
 
-        # Add all nodes with community labels
+        # Add all nodes
         for community_idx, (role, members) in enumerate(communities.items()):
             for p in members:
                 self.graph.add_node(p.id, community=community_idx, role=role)
 
-        # Intra-community edges (dense connections within groups)
-        params = GRAPH_PARAMS[self.platform]
-        for _role, members in communities.items():
-            member_ids = [p.id for p in members]
-            n_members = len(member_ids)
-            if n_members < 2:
+        # Step 2: Within each community, build hub-spoke structure
+        community_hubs: dict[int, list[str]] = {}
+        for community_idx, (role, members) in enumerate(communities.items()):
+            if len(members) < 2:
                 continue
 
-            # Each member connects to ~30-50% of their community
-            for p_id in member_ids:
-                n_connections = max(1, int(n_members * rng.uniform(0.15, 0.35)))
-                targets = [t for t in member_ids if t != p_id]
-                rng.shuffle(targets)
-                for target in targets[:n_connections]:
-                    self.graph.add_edge(p_id, target)
+            # Pick 1-2 hubs per community (prefer power_creators and active_responders)
+            sorted_members = sorted(
+                members,
+                key=lambda p: (
+                    0
+                    if p.agent_tier == AgentTier.POWER_CREATOR
+                    else 1
+                    if p.agent_tier == AgentTier.ACTIVE_RESPONDER
+                    else 2
+                ),
+            )
+            n_hubs = max(1, min(3, len(members) // 8))
+            hubs = sorted_members[:n_hubs]
+            leaves = sorted_members[n_hubs:]
+            community_hubs[community_idx] = [h.id for h in hubs]
 
-        # Inter-community edges (~5-10% of total edges)
-        all_ids = [p.id for p in personas]
-        n_inter = max(1, int(self.edge_count * params["mu"]))
-        for _ in range(n_inter):
-            a, b = rng.sample(all_ids, 2)
-            if self.graph.nodes[a].get("community") != self.graph.nodes[b].get("community"):
-                self.graph.add_edge(a, b)
+            # Connect every leaf to exactly one hub (star topology)
+            for leaf in leaves:
+                hub = rng.choice(hubs)
+                self.graph.add_edge(leaf.id, hub.id)
 
-    def _add_influencer_hubs(self, personas: list[Persona], rng: random.Random) -> None:
-        """Give power creators extra cross-community connections."""
+            # Hub-to-hub connections (if multiple hubs)
+            for i in range(len(hubs)):
+                for j in range(i + 1, len(hubs)):
+                    self.graph.add_edge(hubs[i].id, hubs[j].id)
+
+            # Sparse peer connections: some leaves connect to 1 other leaf
+            member_ids = [p.id for p in members]
+            n_peer = max(0, int(len(leaves) * 0.3))
+            peer_candidates = [l.id for l in leaves]
+            rng.shuffle(peer_candidates)
+            for k in range(0, min(n_peer * 2, len(peer_candidates) - 1), 2):
+                self.graph.add_edge(peer_candidates[k], peer_candidates[k + 1])
+
+        # Step 3: Sparse bridges between communities
+        community_ids = list(community_hubs.keys())
+        if len(community_ids) >= 2:
+            # Connect community hubs to hubs of other communities
+            for ci in community_ids:
+                # Each community gets 1-2 bridges to other communities
+                other_communities = [c for c in community_ids if c != ci]
+                n_bridges = min(len(other_communities), rng.randint(1, 2))
+                bridge_targets = rng.sample(other_communities, n_bridges)
+                for cj in bridge_targets:
+                    hub_a = rng.choice(community_hubs[ci])
+                    hub_b = rng.choice(community_hubs[cj])
+                    if not self.graph.has_edge(hub_a, hub_b):
+                        self.graph.add_edge(hub_a, hub_b)
+
+            # A few random cross-community bridges for non-hubs
+            all_ids = [p.id for p in personas]
+            n_random_bridges = max(1, int(len(all_ids) * params["inter_bridge_ratio"]))
+            for _ in range(n_random_bridges):
+                a, b = rng.sample(all_ids, 2)
+                if self.graph.nodes[a].get("community") != self.graph.nodes[b].get(
+                    "community"
+                ) and not self.graph.has_edge(a, b):
+                    self.graph.add_edge(a, b)
+
+        # Step 4: Boost power_creators with extra connections
         creators = [p for p in personas if p.agent_tier == AgentTier.POWER_CREATOR]
         all_ids = [p.id for p in personas]
-
         for creator in creators:
-            # Influencers get 3-5x more connections than average
-            n_extra = max(3, int(len(all_ids) * 0.02))
+            current_degree = self.graph.degree(creator.id)
+            n_extra = max(0, params["influencer_extra"] - current_degree + 2)
             targets = [t for t in all_ids if t != creator.id and not self.graph.has_edge(creator.id, t)]
             rng.shuffle(targets)
             for target in targets[:n_extra]:
                 self.graph.add_edge(creator.id, target)
-                # For directed graphs, also add reverse follows (people follow influencers)
                 if self.is_directed:
                     self.graph.add_edge(target, creator.id)
 
-    def _add_weak_ties(self, rng: random.Random) -> None:
-        """Add Granovetter-style bridge edges between communities."""
-        communities = {}
-        for node, data in self.graph.nodes(data=True):
-            c = data.get("community", 0)
-            communities.setdefault(c, []).append(node)
-
-        community_list = list(communities.values())
-        if len(community_list) < 2:
-            return
-
-        # Add ~5% weak ties
-        n_weak = max(1, int(self.edge_count * 0.05))
-        for _ in range(n_weak):
-            c1, c2 = rng.sample(community_list, 2)
-            if c1 and c2:
-                a = rng.choice(c1)
-                b = rng.choice(c2)
-                self.graph.add_edge(a, b)
+        # Step 5: Ensure minimum degree
+        min_degree = params["min_degree"]
+        for p in personas:
+            degree = self.graph.degree(p.id)
+            if degree < min_degree:
+                targets = [t for t in all_ids if t != p.id and not self.graph.has_edge(p.id, t)]
+                if targets:
+                    rng.shuffle(targets)
+                    for target in targets[: min_degree - degree]:
+                        self.graph.add_edge(p.id, target)
 
     def _count_communities(self) -> int:
         """Count unique communities in the graph."""

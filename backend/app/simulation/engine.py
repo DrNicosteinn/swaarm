@@ -87,15 +87,41 @@ class SimulationEngine:
         )
 
         try:
+            # Emit initial snapshot with graph structure
+            await self._emit_graph_snapshot(round_num=0)
+
             for round_num in range(1, self.config.round_count + 1):
-                round_metrics = await self._run_round(round_num)
+                round_metrics, round_actions = await self._run_round(round_num)
                 self.round_metrics.append(round_metrics)
                 completed_rounds = round_num
 
                 # Save metrics to DB
                 await self.db.save_round_metrics(round_num, round_metrics.model_dump_json())
 
-                # Emit round complete event
+                # Emit round complete event with actions and graph data
+                action_events = []
+                for a in round_actions:
+                    persona = self.persona_map.get(a.agent_id)
+                    state = self.agent_states.get(a.agent_id)
+                    action_events.append(
+                        {
+                            "agent_id": a.agent_id,
+                            "agent_name": persona.name if persona else a.agent_id,
+                            "action_type": a.action_type,
+                            "content": a.content,
+                            "target_post_id": a.target_post_id,
+                            "target_user_id": a.target_user_id,
+                            "sentiment": state.current_sentiment if state else 0.0,
+                        }
+                    )
+
+                # Detect new follow/connect edges added this round
+                new_links = [
+                    {"source": a.agent_id, "target": a.target_user_id, "type": a.action_type}
+                    for a in round_actions
+                    if a.action_type in ("follow_user", "connect") and a.target_user_id
+                ]
+
                 await self._emit_event(
                     SimulationEvent(
                         round=round_num,
@@ -105,6 +131,9 @@ class SimulationEngine:
                             "posts_created": round_metrics.posts_created,
                             "avg_sentiment": round_metrics.avg_sentiment,
                             "cost_usd": round_metrics.cost_usd,
+                            "actions": action_events,
+                            "new_nodes": [],  # All nodes sent in initial snapshot
+                            "new_links": new_links,
                         },
                     )
                 )
@@ -167,7 +196,54 @@ class SimulationEngine:
 
         return result
 
-    async def _run_round(self, round_num: int) -> RoundMetrics:
+    async def _emit_graph_snapshot(self, round_num: int) -> None:
+        """Emit a snapshot event with the full graph structure for the frontend."""
+        _tier_followers = {
+            "power_creator": 400,
+            "active_responder": 120,
+            "selective_engager": 50,
+            "observer": 15,
+        }
+        nodes = []
+        for persona in self.personas:
+            community = self.graph.get_community(persona.id)
+            state = self.agent_states.get(persona.id, AgentState(persona_id=persona.id))
+            tier_str = persona.agent_tier.value if persona.agent_tier else "observer"
+            nodes.append(
+                {
+                    "id": persona.id,
+                    "label": persona.name,
+                    "communityId": community,
+                    "sentiment": state.current_sentiment,
+                    "followerCount": _tier_followers.get(tier_str, 15),
+                    "tier": tier_str,
+                    "role": persona.stakeholder_role or "",
+                    "occupation": persona.occupation or "",
+                }
+            )
+
+        links = []
+        seen_edges = set()
+        for u, v in self.graph.graph.edges():
+            key = f"{u}->{v}"
+            if key not in seen_edges:
+                seen_edges.add(key)
+                links.append({"source": u, "target": v, "type": "follow"})
+
+        await self._emit_event(
+            SimulationEvent(
+                round=round_num,
+                event_type="snapshot",
+                data={
+                    "current_round": round_num,
+                    "total_rounds": self.config.round_count,
+                    "nodes": nodes,
+                    "links": links,
+                },
+            )
+        )
+
+    async def _run_round(self, round_num: int) -> tuple[RoundMetrics, list[AgentAction]]:
         """Execute a single simulation round."""
         round_start = time.monotonic()
         round_tokens = 0
@@ -277,7 +353,7 @@ class SimulationEngine:
 
         round_duration = time.monotonic() - round_start
 
-        return RoundMetrics(
+        metrics = RoundMetrics(
             round_number=round_num,
             active_agents=len(active_indices),
             posts_created=posts_created,
@@ -292,6 +368,7 @@ class SimulationEngine:
             duration_seconds=round(round_duration, 3),
             error_count=round_errors,
         )
+        return metrics, actions_this_round
 
     async def _process_agent_full(
         self, persona: Persona, round_num: int, agent_index: int
@@ -446,9 +523,7 @@ class SimulationEngine:
 
         return "\n".join(parts)
 
-    def _build_user_prompt(
-        self, persona: Persona, memory_text: str, feed_text: str, round_num: int
-    ) -> str:
+    def _build_user_prompt(self, persona: Persona, memory_text: str, feed_text: str, round_num: int) -> str:
         """Build the user prompt with dynamic content (memory + feed)."""
         # Encourage creators to post original content, not just comment
         creator_hint = ""

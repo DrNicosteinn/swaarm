@@ -32,10 +32,14 @@ class ProfessionalProfile(BaseModel):
     headline: str = ""
     connection_count: int = Field(default=400, ge=0, le=30000)
     compliance_awareness: float = Field(
-        default=0.3, ge=0.0, le=1.0,
+        default=0.3,
+        ge=0.0,
+        le=1.0,
         description="How cautious about posting (high in banking/pharma)",
     )
     thought_leadership_score: float = Field(
-        default=0.3, ge=0.0, le=1.0,
+        default=0.3,
+        ge=0.0,
+        le=1.0,
         description="How much they position as industry thought leader",
     )

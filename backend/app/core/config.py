@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     swaarm_llm_model: str = "gpt-4o-mini"  # Renamed to avoid collision with Claude Code env var
+    swaarm_orchestrator_model: str = "gpt-4.1"  # Fast + high quality for persona orchestration
 
     # Redis
     redis_url: str = "redis://localhost:6379"

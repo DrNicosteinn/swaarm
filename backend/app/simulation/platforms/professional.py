@@ -50,10 +50,19 @@ class ProfessionalNetworkPlatform(PlatformBase):
 
     def get_action_types(self) -> list[str]:
         return [
-            "create_post", "create_article",
-            "react_like", "react_celebrate", "react_insightful",
-            "react_support", "react_love", "react_funny",
-            "comment", "reply", "share", "connect", "do_nothing",
+            "create_post",
+            "create_article",
+            "react_like",
+            "react_celebrate",
+            "react_insightful",
+            "react_support",
+            "react_love",
+            "react_funny",
+            "comment",
+            "reply",
+            "share",
+            "connect",
+            "do_nothing",
         ]
 
     def get_tools_schema(self) -> list[dict]:
@@ -205,8 +214,12 @@ class ProfessionalNetworkPlatform(PlatformBase):
         return [self._to_feed_item(p) for p in feed_posts[:feed_size]]
 
     def _score_post(
-        self, post: dict, viewer_id: str, viewer_persona: Persona,
-        current_round: int, connections: set[str],
+        self,
+        post: dict,
+        viewer_id: str,
+        viewer_persona: Persona,
+        current_round: int,
+        connections: set[str],
     ) -> float:
         """LinkedIn-style scoring with expertise alignment and dwell prediction."""
         # Engagement (log-dampened, heavier than Twitter)
@@ -311,14 +324,19 @@ class ProfessionalNetworkPlatform(PlatformBase):
             post_id = f"p-{uuid.uuid4().hex[:8]}"
             content = (action.content or "")[:3000]  # LinkedIn limit
             await self.db.insert_post(
-                post_id=post_id, author_id=action.agent_id,
-                content=content, created_round=action.round_number,
+                post_id=post_id,
+                author_id=action.agent_id,
+                content=content,
+                created_round=action.round_number,
                 hashtags=action.hashtags,
                 content_format="article" if at == "create_article" else "text",
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, at,
-                content=content, metadata={"post_id": post_id},
+                action.round_number,
+                action.agent_id,
+                at,
+                content=content,
+                metadata={"post_id": post_id},
             )
             return True
 
@@ -326,11 +344,16 @@ class ProfessionalNetworkPlatform(PlatformBase):
             reaction = at.replace("react_", "")
             like_id = f"l-{uuid.uuid4().hex[:8]}"
             await self.db.insert_like(
-                like_id, action.target_post_id, action.agent_id,
-                action.round_number, reaction_type=reaction,
+                like_id,
+                action.target_post_id,
+                action.agent_id,
+                action.round_number,
+                reaction_type=reaction,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, at,
+                action.round_number,
+                action.agent_id,
+                at,
                 target_id=action.target_post_id,
                 metadata={"reaction": reaction},
             )
@@ -339,23 +362,33 @@ class ProfessionalNetworkPlatform(PlatformBase):
         if at == "comment" and action.target_post_id:
             comment_id = f"c-{uuid.uuid4().hex[:8]}"
             await self.db.insert_comment(
-                comment_id, action.target_post_id, action.agent_id,
-                action.content or "", action.round_number,
+                comment_id,
+                action.target_post_id,
+                action.agent_id,
+                action.content or "",
+                action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, at,
-                content=action.content, target_id=action.target_post_id,
+                action.round_number,
+                action.agent_id,
+                at,
+                content=action.content,
+                target_id=action.target_post_id,
             )
             return True
 
         if at == "share" and action.target_post_id:
             repost_id = f"s-{uuid.uuid4().hex[:8]}"
             await self.db.insert_repost(
-                repost_id, action.target_post_id, action.agent_id,
+                repost_id,
+                action.target_post_id,
+                action.agent_id,
                 action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, at,
+                action.round_number,
+                action.agent_id,
+                at,
                 target_id=action.target_post_id,
             )
             return True
@@ -363,10 +396,14 @@ class ProfessionalNetworkPlatform(PlatformBase):
         if at == "connect" and action.target_user_id:
             self.graph.add_edge(action.agent_id, action.target_user_id)
             await self.db.insert_follow(
-                action.agent_id, action.target_user_id, action.round_number,
+                action.agent_id,
+                action.target_user_id,
+                action.round_number,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, at,
+                action.round_number,
+                action.agent_id,
+                at,
                 target_id=action.target_user_id,
             )
             return True
@@ -380,11 +417,16 @@ class ProfessionalNetworkPlatform(PlatformBase):
             reaction = action.reaction_type or "like"
             like_id = f"l-{uuid.uuid4().hex[:8]}"
             await self.db.insert_like(
-                like_id, action.target_post_id, action.agent_id,
-                action.round_number, reaction_type=reaction,
+                like_id,
+                action.target_post_id,
+                action.agent_id,
+                action.round_number,
+                reaction_type=reaction,
             )
             await self.db.log_action(
-                action.round_number, action.agent_id, f"react_{reaction}",
+                action.round_number,
+                action.agent_id,
+                f"react_{reaction}",
                 target_id=action.target_post_id,
             )
             return True

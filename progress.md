@@ -84,14 +84,28 @@
 - API: /start, /status/{id}, /list
 - In-Memory Job Tracking (→ Supabase in Produktion)
 
-### Issue #8: Live-View ✅
+### Issue #8: Live-View ✅ (Major Rework 2026-04-06)
 - Backend: ConnectionManager (per-Client Queue, Backpressure)
 - Backend: WebSocket Endpoint mit JWT Auth
-- Frontend: SimulationPage (Split-View 60/40: Graph + Feed + Metriken)
-- Frontend: LiveFeed (scrollende Aktions-Liste mit Sentiment-Farben)
-- Frontend: MetricsBar (Fortschritt, Sentiment, aktive Agents)
-- Frontend: useSimulationStream Hook (Auto-Reconnect, Backoff)
-- react-force-graph-2d installiert
+- Backend: **Graph-Algorithmus komplett ueberarbeitet** — Sparse Hub-Spoke statt Dense Random
+  - Vorher: 15-35% Intra-Community-Verbindungen (6-14 Kanten/Agent) → visuelles Chaos
+  - Nachher: Hub-Spoke-Topologie mit avg 2-4 Kanten/Agent → klar lesbare Struktur
+  - Hubs werden pro Community automatisch aus Power Creators gewaehlt
+  - Sparse Inter-Community-Bridges (8-12% der Nodes)
+  - 187 Backend-Tests bestanden
+- Frontend: **SimulationPage komplett neu gebaut** — Dark-Theme Immersive Split-View
+  - NetworkGraph (react-force-graph-2d): Stabile Node-Positionen, inkrementelles Hinzufuegen
+  - MiroFish-inspiriertes Design: Dot-Grid, weisse Borders, Community-Farbringe
+  - Zoom-adaptive Node-Groessen (Nodes schrumpfen beim Reinzoomen → Kanten sichtbar)
+  - LiveFeed: Persona-Spawns, Runden-Marker, Phasen-Wechsel, Action-Icons, Sentiment-Farben
+  - StatsPanel: Fortschritt, Sentiment-Balken, Mini-Charts, Engagement-Counters
+  - PhaseTimeline: Animierte Phase-Pills (Personas → Simulation → Report → Fertig)
+  - Graph sichtbar ab Persona-Generierung (nicht erst bei Simulation)
+- Frontend: **Preview-Page mit realistischem SwissBank-Krise-Szenario**
+  - 31 handgeschriebene Personas mit Rollen (CEO, HR, Journalist, Ehefrau, etc.)
+  - 40 benannte Beziehungen (arbeitet bei, interviewt, Ehefrau von, beaufsichtigt, etc.)
+  - 5 Stakeholder-Communities: SwissBank, Kunden, Medien, Familie, Regulierer
+- Frontend: useSimulationStream Hook erweitert (Graph-Daten, Feed-Events, Sentiment-History)
 - Bauplan: docs/LIVE_VIEW_BAUPLAN.md
 
 ### Issue #9: Report Generator ✅
@@ -124,7 +138,7 @@ Was gebaut wurde:
 - Engine Platform-Factory (wählt Public/Professional basierend auf Config)
 - Undirected Graph für bilaterale Connections verifiziert — 19 Tests
 
-**Running total: 187 Tests, 0 Lint-Fehler**
+**Running total: 187 Tests bestanden, 0 Lint-Fehler**
 
 ### E2E Testing & Debugging Session ✅
 
