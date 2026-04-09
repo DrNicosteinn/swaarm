@@ -12,112 +12,95 @@ from app.simulation.personas import PersonaGenerationConfig, PersonaGenerator
 
 
 class MockPersonaLLM(LLMProvider):
-    """Mock LLM that returns realistic persona JSON."""
+    """Mock LLM that returns realistic persona JSON.
+
+    Differentiates between research calls (returns roster array)
+    and single persona calls (returns persona object).
+    """
+
+    _call_count: int = 0
 
     async def chat(self, messages, tools=None, temperature=0.7, max_tokens=500) -> LLMResponse:
-        # Return a batch of 3 test personas
-        personas = [
-            {
-                "name": "Claudia Meier",
-                "age": 38,
-                "gender": "female",
-                "country": "CH",
-                "region": "Zürich",
-                "occupation": "Produktmanagerin",
-                "industry": "Versicherung",
-                "education": "Uni St. Gallen",
-                "sinus_milieu": "Performer",
-                "big_five": {
-                    "openness": 0.7,
-                    "conscientiousness": 0.8,
-                    "extraversion": 0.4,
-                    "agreeableness": 0.6,
-                    "neuroticism": 0.3,
+        self._call_count += 1
+        prompt = messages[-1]["content"] if messages else ""
+
+        # Research call: returns roster array
+        if "Erstelle eine JSON-Liste" in prompt:
+            roster = [
+                {
+                    "role": "company",
+                    "name": "SwissBank AG",
+                    "occupation": "Unternehmen",
+                    "age": 0,
+                    "gender": "male",
+                    "connection_to": None,
+                    "connection_label": None,
+                    "sentiment_bias": 0.3,
                 },
-                "posting_style": {
-                    "tone": "sachlich",
-                    "frequency": "weekly",
-                    "typical_topics": ["Versicherung", "Digitalisierung"],
+                {
+                    "role": "employees",
+                    "name": "Claudia Meier",
+                    "occupation": "Produktmanagerin",
+                    "age": 38,
+                    "gender": "female",
+                    "connection_to": "p0",
+                    "connection_label": "arbeitet bei",
+                    "sentiment_bias": -0.5,
                 },
-                "opinions": {
-                    "trust_institutions": 0.7,
-                    "environmental_concern": 0.6,
-                    "tech_optimism": 0.8,
-                    "economic_anxiety": 0.3,
-                    "social_progressivism": 0.5,
+                {
+                    "role": "media",
+                    "name": "Max Richter",
+                    "occupation": "Tech-Journalist",
+                    "age": 31,
+                    "gender": "male",
+                    "connection_to": "p0",
+                    "connection_label": "berichtet ueber",
+                    "sentiment_bias": -0.1,
                 },
-                "interests": ["FinTech", "Wandern", "Innovation"],
-                "bio": "Claudia arbeitet seit 10 Jahren in der Versicherungsbranche.",
+                {
+                    "role": "customers",
+                    "name": "Lisa Hofer",
+                    "occupation": "HR-Managerin",
+                    "age": 42,
+                    "gender": "female",
+                    "connection_to": "p0",
+                    "connection_label": "Kundin von",
+                    "sentiment_bias": -0.3,
+                },
+            ]
+            return LLMResponse(content=json.dumps(roster), input_tokens=400, output_tokens=600, model="mock")
+
+        # Single persona generation call: returns persona object
+        single_persona = {
+            "country": "CH",
+            "region": "Zürich",
+            "education": "Uni St. Gallen",
+            "big_five": {
+                "openness": 0.7,
+                "conscientiousness": 0.8,
+                "extraversion": 0.4,
+                "agreeableness": 0.6,
+                "neuroticism": 0.3,
             },
-            {
-                "name": "Max Richter",
-                "age": 31,
-                "gender": "male",
-                "country": "DE",
-                "region": "Berlin",
-                "occupation": "Tech-Journalist",
-                "industry": "Medien",
-                "education": "FU Berlin",
-                "sinus_milieu": "Expeditives",
-                "big_five": {
-                    "openness": 0.9,
-                    "conscientiousness": 0.5,
-                    "extraversion": 0.7,
-                    "agreeableness": 0.3,
-                    "neuroticism": 0.5,
-                },
-                "posting_style": {
-                    "tone": "provokativ",
-                    "frequency": "daily",
-                    "typical_topics": ["KI", "Digitalpolitik"],
-                },
-                "opinions": {
-                    "trust_institutions": 0.3,
-                    "environmental_concern": 0.5,
-                    "tech_optimism": 0.7,
-                    "economic_anxiety": 0.4,
-                    "social_progressivism": 0.8,
-                },
-                "interests": ["Netzpolitik", "Startups", "Podcasts"],
-                "bio": "Max schreibt für t3n und Heise über Tech-Themen.",
+            "posting_style": {
+                "tone": "sachlich",
+                "frequency": "weekly",
+                "typical_topics": ["Versicherung", "Digitalisierung"],
             },
-            {
-                "name": "Lisa Hofer",
-                "age": 42,
-                "gender": "female",
-                "country": "AT",
-                "region": "Wien",
-                "occupation": "HR-Managerin",
-                "industry": "Tech",
-                "education": "WU Wien",
-                "sinus_milieu": "Adaptiv-Pragmatische Mitte",
-                "big_five": {
-                    "openness": 0.6,
-                    "conscientiousness": 0.7,
-                    "extraversion": 0.6,
-                    "agreeableness": 0.8,
-                    "neuroticism": 0.4,
-                },
-                "posting_style": {
-                    "tone": "empathisch",
-                    "frequency": "weekly",
-                    "typical_topics": ["HR", "NewWork"],
-                },
-                "opinions": {
-                    "trust_institutions": 0.6,
-                    "environmental_concern": 0.7,
-                    "tech_optimism": 0.6,
-                    "economic_anxiety": 0.5,
-                    "social_progressivism": 0.7,
-                },
-                "interests": ["Coaching", "Arbeitsrecht", "Reisen"],
-                "bio": "Lisa leitet People & Culture bei einem Wiener Tech-Startup.",
+            "opinions": {
+                "trust_institutions": 0.7,
+                "environmental_concern": 0.6,
+                "tech_optimism": 0.8,
+                "economic_anxiety": 0.3,
+                "social_progressivism": 0.5,
             },
-        ]
+            "interests": ["FinTech", "Wandern", "Innovation"],
+            "bio": "Persona für die Simulation.",
+        }
         return LLMResponse(
-            content=json.dumps(personas),
-            input_tokens=800,
-            output_tokens=1200,
+            content=json.dumps(single_persona),
+            input_tokens=200,
+            output_tokens=400,
             model="mock",
         )
 

@@ -19,6 +19,14 @@ export interface GraphNode {
   sentiment: number
   followerCount: number
   tier: string
+  role?: string
+  occupation?: string
+  // Entity-pipeline fields
+  entityType?: string       // "real_person", "real_company", "role", etc.
+  subType?: string          // "CEO", "Journalist", "Kunde"
+  personaSource?: string    // "real_enriched", "role_based", "generated"
+  isEntity?: boolean        // true for entity nodes (before persona phase)
+  importance?: number       // 0-1, for node size in entity phase
   x?: number
   y?: number
 }
@@ -27,7 +35,10 @@ export interface GraphLink {
   source: string
   target: string
   type: string
+  label?: string            // "ist CEO von", "konkurriert mit"
 }
+
+// ── Existing event types ────────────────────────────────────────────
 
 export interface RoundCompleteEvent {
   type: 'round_complete'
@@ -64,8 +75,57 @@ export interface SnapshotEvent {
   }
 }
 
+// ── New entity-pipeline event types ─────────────────────────────────
+
+export interface PhaseChangedEvent {
+  type: 'phase_changed'
+  data: {
+    phase: string
+    detail: string
+    persona_count?: number
+    recommended_platform?: string
+  }
+}
+
+export interface EntityExtractedEvent {
+  type: 'entity_extracted'
+  data: {
+    node: GraphNode
+    links: GraphLink[]
+  }
+}
+
+export interface EntityEnrichedEvent {
+  type: 'entity_enriched'
+  data: {
+    entity_name: string
+    node: Partial<GraphNode>
+  }
+}
+
+export interface EnrichmentFailedEvent {
+  type: 'enrichment_failed'
+  data: {
+    entity_name: string
+    reason: string
+  }
+}
+
+export interface PersonaBatchEvent {
+  type: 'persona_batch'
+  data: {
+    nodes: GraphNode[]
+    links: GraphLink[]
+  }
+}
+
 export type SimulationEvent =
   | RoundCompleteEvent
   | SimulationCompleteEvent
   | SnapshotEvent
+  | PhaseChangedEvent
+  | EntityExtractedEvent
+  | EntityEnrichedEvent
+  | EnrichmentFailedEvent
+  | PersonaBatchEvent
   | { type: 'pong' }

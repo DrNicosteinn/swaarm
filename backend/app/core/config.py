@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Sentry
     sentry_dsn: str = ""
 
+    # Serper (web enrichment)
+    serper_api_key: str = ""
+
     # Simulation defaults
     default_agent_count: int = 200
     default_round_count: int = 50
