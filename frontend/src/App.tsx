@@ -4,7 +4,6 @@ import { RegisterPage } from '@/pages/RegisterPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { SimulationPage } from '@/pages/SimulationPage'
 import { NewSimulationPage } from '@/pages/NewSimulationPage'
-import { PreviewSimulationPage } from '@/pages/_PreviewSimulation'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 function App() {
@@ -41,9 +40,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-
-      {/* DEV: Preview route (no auth) */}
-      <Route path="/preview/simulation" element={<PreviewSimulationPage />} />
 
       {/* Redirect root to dashboard (or login if not authenticated) */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
