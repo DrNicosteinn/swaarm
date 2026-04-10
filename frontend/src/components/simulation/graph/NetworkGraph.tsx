@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { select } from 'd3-selection'
+import 'd3-transition' // Augments d3-selection with .transition()
 import { zoom as d3zoom, zoomIdentity, type ZoomTransform } from 'd3-zoom'
 import type { GraphNode as StreamNode, GraphLink as StreamLink } from '@/lib/ws-events'
 import {
@@ -116,17 +117,26 @@ export function NetworkGraph({
 
   const handleZoomIn = useCallback(() => {
     if (!svgRef.current || !zoomBehaviorRef.current) return
-    select(svgRef.current).call(zoomBehaviorRef.current.scaleBy, 1.4)
+    select(svgRef.current)
+      .transition()
+      .duration(250)
+      .call(zoomBehaviorRef.current.scaleBy, 1.4)
   }, [])
 
   const handleZoomOut = useCallback(() => {
     if (!svgRef.current || !zoomBehaviorRef.current) return
-    select(svgRef.current).call(zoomBehaviorRef.current.scaleBy, 0.7)
+    select(svgRef.current)
+      .transition()
+      .duration(250)
+      .call(zoomBehaviorRef.current.scaleBy, 0.7)
   }, [])
 
   const handleReset = useCallback(() => {
     if (!svgRef.current || !zoomBehaviorRef.current) return
-    select(svgRef.current).call(zoomBehaviorRef.current.transform, zoomIdentity)
+    select(svgRef.current)
+      .transition()
+      .duration(400)
+      .call(zoomBehaviorRef.current.transform, zoomIdentity)
   }, [])
 
   const handleFitToContent = useCallback(() => {
@@ -142,10 +152,13 @@ export function NetworkGraph({
     const scale = Math.min(width / contentW, height / contentH, 2)
     const tx = width / 2 - ((minX + maxX) / 2) * scale
     const ty = height / 2 - ((minY + maxY) / 2) * scale
-    select(svgRef.current).call(
-      zoomBehaviorRef.current.transform,
-      zoomIdentity.translate(tx, ty).scale(scale),
-    )
+    select(svgRef.current)
+      .transition()
+      .duration(500)
+      .call(
+        zoomBehaviorRef.current.transform,
+        zoomIdentity.translate(tx, ty).scale(scale),
+      )
   }, [positionedNodes, width, height])
 
   return (
