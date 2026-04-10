@@ -117,12 +117,12 @@ function ActionFeedItem({ event }: { event: FeedEvent & { kind: 'action' } }) {
   return (
     <div className={`border rounded-lg p-3 ${sentimentBg(action.sentiment)} animate-feed-in`}>
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 text-gray-400">
+        <div className="mt-0.5 text-gray-600">
           <ActionIcon type={action.action_type} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-white text-sm">{action.agent_name}</span>
+            <span className="font-medium text-gray-900 text-sm">{action.agent_name}</span>
             <span className="text-gray-500 text-xs">
               {actionLabels[action.action_type] || action.action_type}
             </span>
@@ -131,13 +131,13 @@ function ActionFeedItem({ event }: { event: FeedEvent & { kind: 'action' } }) {
             </span>
           </div>
           {action.content && (
-            <p className="text-gray-300 text-xs leading-relaxed mt-1.5 line-clamp-3">
+            <p className="text-gray-700 text-xs leading-relaxed mt-1.5 line-clamp-3">
               {action.content}
             </p>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-600">
+      <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400">
         <span>Runde {event.round}</span>
       </div>
     </div>
@@ -159,10 +159,10 @@ function PersonaSpawnItem({ node }: { node: GraphNode }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 animate-feed-in">
       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-      <span className="text-gray-400 text-xs">
-        <span className="text-indigo-400 font-medium">{node.label}</span>
+      <span className="text-gray-600 text-xs">
+        <span className="text-indigo-500 font-medium">{node.label}</span>
         {' '}ist dem Netzwerk beigetreten
-        <span className="text-gray-600 ml-1">
+        <span className="text-gray-400 ml-1">
           ({detail})
         </span>
       </span>
@@ -173,11 +173,11 @@ function PersonaSpawnItem({ node }: { node: GraphNode }) {
 function RoundMarkerItem({ round, activeAgents }: { round: number; activeAgents: number }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 my-1">
-      <div className="flex-1 h-px bg-gray-800" />
+      <div className="flex-1 h-px bg-gray-200" />
       <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
         Runde {round} &middot; {activeAgents} aktiv
       </span>
-      <div className="flex-1 h-px bg-gray-800" />
+      <div className="flex-1 h-px bg-gray-200" />
     </div>
   )
 }
@@ -197,7 +197,7 @@ function PhaseChangeItem({ phase, detail }: { phase: string; detail: string }) {
     <div className="flex items-center gap-3 px-3 py-2 my-1 bg-blue-500/10 rounded-lg border border-blue-500/20 animate-feed-in">
       <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
       <div>
-        <span className="text-blue-400 text-xs font-medium">
+        <span className="text-blue-500 text-xs font-medium">
           {phaseLabels[phase] || phase}
         </span>
         {detail && (
@@ -222,10 +222,10 @@ function EntityFoundItem({ entityName, entityType, subType }: { entityName: stri
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 animate-feed-in">
       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-      <span className="text-gray-400 text-xs">
-        <span className="text-emerald-400 font-medium">{entityName}</span>
+      <span className="text-gray-600 text-xs">
+        <span className="text-emerald-500 font-medium">{entityName}</span>
         {' '}erkannt
-        <span className="text-gray-600 ml-1">
+        <span className="text-gray-400 ml-1">
           ({entityTypeLabels[entityType] || entityType}{subType ? ` — ${subType}` : ''})
         </span>
       </span>
@@ -237,8 +237,8 @@ function EntityEnrichedItem({ entityName }: { entityName: string }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 animate-feed-in">
       <div className="w-2 h-2 rounded-full bg-cyan-500" />
-      <span className="text-gray-400 text-xs">
-        <span className="text-cyan-400 font-medium">{entityName}</span>
+      <span className="text-gray-600 text-xs">
+        <span className="text-cyan-500 font-medium">{entityName}</span>
         {' '}angereichert
       </span>
     </div>
@@ -249,8 +249,8 @@ function EnrichmentFailedItem({ entityName }: { entityName: string }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 animate-feed-in">
       <div className="w-2 h-2 rounded-full bg-amber-500" />
-      <span className="text-gray-400 text-xs">
-        <span className="text-amber-400 font-medium">{entityName}</span>
+      <span className="text-gray-600 text-xs">
+        <span className="text-amber-500 font-medium">{entityName}</span>
         {' '}— Recherche fehlgeschlagen
       </span>
     </div>
@@ -282,8 +282,8 @@ export function LiveFeed({ events, maxItems = 100 }: LiveFeedProps) {
 
   if (displayEvents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-600 gap-2">
-        <div className="w-8 h-8 border-2 border-gray-700 border-t-gray-500 rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
         <span className="text-sm">Warte auf Aktivitaet...</span>
       </div>
     )
@@ -292,8 +292,8 @@ export function LiveFeed({ events, maxItems = 100 }: LiveFeedProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
-        <span className="text-xs font-medium text-gray-400">Live Feed</span>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
+        <span className="text-xs font-medium text-gray-600">Live Feed</span>
         {!autoScroll && (
           <button
             onClick={() => {

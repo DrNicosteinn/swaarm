@@ -115,12 +115,12 @@ export function PhaseTimeline({
               className={`
                 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-500
                 ${isFailed && isActive
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  ? 'bg-red-500/20 text-red-500 border border-red-500/30'
                   : phaseDone
-                    ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                    ? 'bg-green-500/15 text-green-600 border border-green-500/20'
                     : isActive
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-gray-800/50 text-gray-600 border border-gray-800'
+                      ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                      : 'bg-gray-100 text-gray-500 border border-gray-200'
                 }
               `}
             >
@@ -137,7 +137,7 @@ export function PhaseTimeline({
             {idx < PHASES.length - 1 && (
               <div
                 className={`w-6 h-px transition-colors duration-500 ${
-                  idx < activeIdx || isDone ? 'bg-green-500/40' : 'bg-gray-800'
+                  idx < activeIdx || isDone ? 'bg-green-500/40' : 'bg-gray-200'
                 }`}
               />
             )}
@@ -147,7 +147,7 @@ export function PhaseTimeline({
 
       {/* Detail text */}
       {phaseDetail && !isDone && !isFailed && (
-        <span className="text-[10px] text-gray-600 ml-2 truncate max-w-[200px]">
+        <span className="text-[10px] text-gray-400 ml-2 truncate max-w-[200px]">
           {phaseDetail}
         </span>
       )}

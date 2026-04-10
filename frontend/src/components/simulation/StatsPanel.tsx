@@ -57,12 +57,12 @@ function SentimentBar({ value }: { value: number }) {
   const pct = ((value + 1) / 2) * 100
 
   return (
-    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden relative">
+    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
       {/* Gradient background: red → gray → green */}
-      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-gray-600 to-green-500 opacity-30" />
+      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-gray-400 to-green-500 opacity-30" />
       {/* Indicator */}
       <div
-        className="absolute top-0 h-full w-1.5 bg-white rounded-full shadow-sm transition-all duration-700"
+        className="absolute top-0 h-full w-1.5 bg-gray-900 rounded-full shadow-sm transition-all duration-700"
         style={{ left: `calc(${pct}% - 3px)` }}
       />
     </div>
@@ -81,10 +81,10 @@ function StatTile({
   color?: string
 }) {
   return (
-    <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-800">
+    <div className="bg-white rounded-lg p-3 border border-gray-200">
       <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{label}</div>
-      <div className={`text-xl font-bold tabular-nums ${color || 'text-white'}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5">{sub}</div>}
+      <div className={`text-xl font-bold tabular-nums ${color || 'text-gray-900'}`}>{value}</div>
+      {sub && <div className="text-[10px] text-gray-400 mt-0.5">{sub}</div>}
     </div>
   )
 }
@@ -105,11 +105,11 @@ export function StatsPanel({
   const progress = totalRounds > 0 ? (currentRound / totalRounds) * 100 : 0
 
   const sentimentLabel = useMemo(() => {
-    if (avgSentiment > 0.3) return { text: 'Sehr positiv', color: 'text-green-400' }
-    if (avgSentiment > 0.1) return { text: 'Positiv', color: 'text-green-400' }
-    if (avgSentiment < -0.3) return { text: 'Sehr negativ', color: 'text-red-400' }
-    if (avgSentiment < -0.1) return { text: 'Negativ', color: 'text-red-400' }
-    return { text: 'Neutral', color: 'text-gray-400' }
+    if (avgSentiment > 0.3) return { text: 'Sehr positiv', color: 'text-green-500' }
+    if (avgSentiment > 0.1) return { text: 'Positiv', color: 'text-green-500' }
+    if (avgSentiment < -0.3) return { text: 'Sehr negativ', color: 'text-red-500' }
+    if (avgSentiment < -0.1) return { text: 'Negativ', color: 'text-red-500' }
+    return { text: 'Neutral', color: 'text-gray-500' }
   }, [avgSentiment])
 
   const totalEngagement = postsCreated + commentsCreated + likesCreated
@@ -117,42 +117,42 @@ export function StatsPanel({
   return (
     <div className="flex flex-col h-full p-3 space-y-3 overflow-y-auto">
       {/* Progress */}
-      <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-800">
+      <div className="bg-white rounded-lg p-3 border border-gray-200">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400">Fortschritt</span>
-          <span className="text-xs font-mono text-gray-400">
+          <span className="text-xs text-gray-600">Fortschritt</span>
+          <span className="text-xs font-mono text-gray-600">
             Runde {currentRound}/{totalRounds}
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-700"
             style={{ width: `${progress}%` }}
           />
         </div>
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[10px] text-gray-600">{Math.round(progress)}%</span>
+          <span className="text-[10px] text-gray-400">{Math.round(progress)}%</span>
           {costUsd > 0 && (
-            <span className="text-[10px] text-gray-600">${costUsd.toFixed(4)}</span>
+            <span className="text-[10px] text-gray-400">${costUsd.toFixed(4)}</span>
           )}
         </div>
       </div>
 
       {/* Sentiment */}
-      <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-800">
+      <div className="bg-white rounded-lg p-3 border border-gray-200">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400">Stimmung</span>
+          <span className="text-xs text-gray-600">Stimmung</span>
           <span className={`text-xs font-medium ${sentimentLabel.color}`}>
             {sentimentLabel.text}
           </span>
         </div>
         <SentimentBar value={avgSentiment} />
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[10px] text-gray-600">Negativ</span>
+          <span className="text-[10px] text-gray-400">Negativ</span>
           <span className="text-[10px] font-mono text-gray-500">
             {avgSentiment > 0 ? '+' : ''}{avgSentiment.toFixed(3)}
           </span>
-          <span className="text-[10px] text-gray-600">Positiv</span>
+          <span className="text-[10px] text-gray-400">Positiv</span>
         </div>
         {sentimentHistory.length > 1 && (
           <div className="mt-2 flex justify-center">
@@ -177,7 +177,7 @@ export function StatsPanel({
 
       {/* Activity chart */}
       {activeHistory.length > 1 && (
-        <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-800">
+        <div className="bg-white rounded-lg p-3 border border-gray-200">
           <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
             Aktivitaet pro Runde
           </div>
