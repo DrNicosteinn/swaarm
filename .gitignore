@@ -32,3 +32,4 @@ actions.jsonl
 # Temp
 *.log
 /tmp/
+.superpowers/
