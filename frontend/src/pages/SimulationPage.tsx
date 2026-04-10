@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useSimulationStatus } from '@/hooks/useSimulationStatus'
 import { useSimulationStream } from '@/hooks/useSimulationStream'
-import { NetworkGraph, NodeTooltip } from '@/components/simulation/NetworkGraph'
+import { NetworkGraph } from '@/components/simulation/graph/NetworkGraph'
+import { PersonaDetailPanel } from '@/components/simulation/graph/panel/PersonaDetailPanel'
+import { streamNodeToSimNode, streamLinkToSimLink, type SimNode } from '@/components/simulation/graph/types'
 import { LiveFeed } from '@/components/simulation/LiveFeed'
 import type { FeedEvent } from '@/components/simulation/LiveFeed'
 import { StatsPanel } from '@/components/simulation/StatsPanel'
 import { PhaseTimeline } from '@/components/simulation/PhaseTimeline'
-import type { GraphNode } from '@/lib/ws-events'
 
 export function SimulationPage() {
   const { id } = useParams<{ id: string }>()
@@ -39,26 +40,17 @@ export function SimulationPage() {
     return () => observer.disconnect()
   }, [])
 
-  // Node hover state (for tooltip)
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+  // Selected node (for detail panel)
+  const [selectedNode, setSelectedNode] = useState<SimNode | null>(null)
 
-  const handleNodeHover = useCallback((node: GraphNode | null) => {
-    setHoveredNode(node)
-  }, [])
-
-  const handleNodeClick = useCallback((_node: GraphNode) => {
-    // Could open a detail panel in the future
-  }, [])
-
-  // Track mouse for tooltip positioning
-  useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      setTooltipPos({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMove)
-    return () => window.removeEventListener('mousemove', handleMove)
-  }, [])
+  const simNodes = useMemo(
+    () => stream.nodes.map(streamNodeToSimNode),
+    [stream.nodes],
+  )
+  const simLinks = useMemo(
+    () => stream.links.map(streamLinkToSimLink),
+    [stream.links],
+  )
 
   // Configuration state
   const [configPlatform, setConfigPlatform] = useState<'public' | 'professional'>('public')
@@ -162,17 +154,24 @@ export function SimulationPage() {
         {/* Left: Network Graph (60%) */}
         <div ref={graphContainerRef} className="flex-[6] relative min-w-0">
           {hasGraphData || phase === 'analyzing' ? (
-            <NetworkGraph
-              nodes={stream.nodes}
-              links={stream.links}
-              activeNodeIds={stream.activeNodeIds}
-              hoveredNodeId={hoveredNode?.id || null}
-              onNodeHover={handleNodeHover}
-              onNodeClick={handleNodeClick}
-              width={graphSize.width}
-              height={graphSize.height}
-              isPulsing={phase === 'analyzing' || phase === 'extracting_entities'}
-            />
+            <>
+              <NetworkGraph
+                nodes={stream.nodes}
+                links={stream.links}
+                activeNodeIds={stream.activeNodeIds}
+                width={graphSize.width}
+                height={graphSize.height}
+                onNodeSelect={setSelectedNode}
+              />
+              {selectedNode && (
+                <PersonaDetailPanel
+                  node={selectedNode}
+                  allNodes={simNodes}
+                  allLinks={simLinks}
+                  onClose={() => setSelectedNode(null)}
+                />
+              )}
+            </>
           ) : (
             <PreSimulationView
               phase={phase}
@@ -289,9 +288,6 @@ export function SimulationPage() {
           )}
         </div>
       </div>
-
-      {/* Node tooltip (floating) */}
-      <NodeTooltip node={hoveredNode} position={tooltipPos} />
 
       {/* Completion overlay */}
       {isDone && (
