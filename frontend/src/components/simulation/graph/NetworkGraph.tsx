@@ -17,6 +17,7 @@ import { EdgesLayer } from './layers/EdgesLayer'
 import { NodesLayer } from './layers/NodesLayer'
 import { THEME } from './utils/colors'
 import { GraphControls } from './controls/GraphControls'
+import { SearchBox } from './controls/SearchBox'
 
 export interface NetworkGraphProps {
   nodes: StreamNode[]
@@ -161,6 +162,22 @@ export function NetworkGraph({
       )
   }, [positionedNodes, width, height])
 
+  const handleSearchSelect = useCallback((node: SimNode) => {
+    if (!svgRef.current || !zoomBehaviorRef.current || node.x == null || node.y == null) return
+    const targetScale = 2
+    const tx = width / 2 - node.x * targetScale
+    const ty = height / 2 - node.y * targetScale
+    select(svgRef.current)
+      .transition()
+      .duration(500)
+      .call(
+        zoomBehaviorRef.current.transform,
+        zoomIdentity.translate(tx, ty).scale(targetScale),
+      )
+    setSelectedId(node.id)
+    onNodeSelect(node)
+  }, [width, height, onNodeSelect])
+
   return (
     <div
       className="relative w-full h-full overflow-hidden"
@@ -217,6 +234,7 @@ export function NetworkGraph({
           </text>
         </g>
       </svg>
+      <SearchBox nodes={positionedNodes} onSelect={handleSearchSelect} />
       <GraphControls
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
