@@ -19,6 +19,7 @@ import { THEME } from './utils/colors'
 import { GraphControls } from './controls/GraphControls'
 import { SearchBox } from './controls/SearchBox'
 import { EntityLegend } from './controls/EntityLegend'
+import { MiniMap } from './controls/MiniMap'
 
 export interface NetworkGraphProps {
   nodes: StreamNode[]
@@ -160,6 +161,33 @@ export function NetworkGraph({
     return ids
   }, [hoveredId, positionedLinks])
 
+  const viewport = useMemo(() => {
+    const k = transform.k
+    return {
+      x: -transform.x / k,
+      y: -transform.y / k,
+      width: width / k,
+      height: height / k,
+    }
+  }, [transform, width, height])
+
+  const handleMiniMapChange = useCallback(
+    (worldX: number, worldY: number) => {
+      if (!svgRef.current || !zoomBehaviorRef.current) return
+      const scale = transform.k
+      const tx = width / 2 - worldX * scale
+      const ty = height / 2 - worldY * scale
+      select(svgRef.current)
+        .transition()
+        .duration(200)
+        .call(
+          zoomBehaviorRef.current.transform,
+          zoomIdentity.translate(tx, ty).scale(scale),
+        )
+    },
+    [transform.k, width, height],
+  )
+
   const handleNodeClick = useCallback((node: SimNode) => {
     setSelectedId(prev => (prev === node.id ? null : node.id))
     onNodeSelect(node)
@@ -299,6 +327,11 @@ export function NetworkGraph({
         onZoomOut={handleZoomOut}
         onFitToContent={handleFitToContent}
         onReset={handleReset}
+      />
+      <MiniMap
+        nodes={visibleNodes}
+        viewport={viewport}
+        onViewportChange={handleMiniMapChange}
       />
     </div>
   )
