@@ -18,6 +18,7 @@ import { NodesLayer } from './layers/NodesLayer'
 import { THEME } from './utils/colors'
 import { GraphControls } from './controls/GraphControls'
 import { SearchBox } from './controls/SearchBox'
+import { EntityLegend } from './controls/EntityLegend'
 
 export interface NetworkGraphProps {
   nodes: StreamNode[]
@@ -42,6 +43,16 @@ export function NetworkGraph({
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
+
+  const handleToggleType = useCallback((type: string) => {
+    setHiddenTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return next
+    })
+  }, [])
 
   // Convert stream nodes to sim nodes (stable: only when count changes)
   const simNodes: SimNode[] = useMemo(
@@ -70,6 +81,49 @@ export function NetworkGraph({
     width,
     height,
   })
+
+  const visibleNodes = useMemo(() => {
+    if (hiddenTypes.size === 0) return positionedNodes
+    const hiddenEntityIds = new Set(
+      positionedNodes.filter(n => n.isEntity && n.entityType && hiddenTypes.has(n.entityType)).map(n => n.id)
+    )
+    const personaHiddenLinks = new Map<string, number>()
+    const personaVisibleLinks = new Map<string, number>()
+    positionedLinks.forEach(link => {
+      if (link.type !== 'persona_entity') return
+      const src = typeof link.source === 'string' ? link.source : link.source.id
+      const tgt = typeof link.target === 'string' ? link.target : link.target.id
+      const personaId = hiddenEntityIds.has(src) ? tgt : hiddenEntityIds.has(tgt) ? src : null
+      if (personaId) {
+        personaHiddenLinks.set(personaId, (personaHiddenLinks.get(personaId) ?? 0) + 1)
+      }
+      const isVisible = !hiddenEntityIds.has(src) && !hiddenEntityIds.has(tgt)
+      if (isVisible) {
+        const srcNode = positionedNodes.find(n => n.id === src)
+        const nonEntityId = srcNode?.isEntity ? tgt : src
+        personaVisibleLinks.set(nonEntityId, (personaVisibleLinks.get(nonEntityId) ?? 0) + 1)
+      }
+    })
+    return positionedNodes.filter(n => {
+      if (n.isEntity) {
+        return !n.entityType || !hiddenTypes.has(n.entityType)
+      }
+      const hidden = personaHiddenLinks.get(n.id) ?? 0
+      const visible = personaVisibleLinks.get(n.id) ?? 0
+      return visible > 0 || hidden === 0
+    })
+  }, [positionedNodes, positionedLinks, hiddenTypes])
+
+  const visibleNodeIds = useMemo(() => new Set(visibleNodes.map(n => n.id)), [visibleNodes])
+
+  const visibleLinks = useMemo(() => {
+    if (hiddenTypes.size === 0) return positionedLinks
+    return positionedLinks.filter(link => {
+      const src = typeof link.source === 'string' ? link.source : link.source.id
+      const tgt = typeof link.target === 'string' ? link.target : link.target.id
+      return visibleNodeIds.has(src) && visibleNodeIds.has(tgt)
+    })
+  }, [positionedLinks, visibleNodeIds, hiddenTypes])
 
   // Initialize d3-zoom on mount
   useEffect(() => {
@@ -201,19 +255,19 @@ export function NetworkGraph({
 
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           <ClusterHulls
-            nodes={positionedNodes}
-            links={positionedLinks}
+            nodes={visibleNodes}
+            links={visibleLinks}
             zoomLevel={zoomLevel}
           />
           <EdgesLayer
-            links={positionedLinks}
-            nodes={positionedNodes}
+            links={visibleLinks}
+            nodes={visibleNodes}
             zoomLevel={zoomLevel}
             focusedIds={focusedIds}
             hoveredLinkIds={new Set()}
           />
           <NodesLayer
-            nodes={positionedNodes}
+            nodes={visibleNodes}
             zoomLevel={zoomLevel}
             hoveredId={hoveredId}
             selectedId={selectedId}
@@ -230,11 +284,16 @@ export function NetworkGraph({
         <g transform={`translate(16, ${height - 24})`}>
           <rect x={-4} y={-14} width={200} height={20} rx={6} fill="rgba(255,255,255,0.9)" stroke={THEME.border} />
           <text fontSize={11} fill={THEME.textMuted} style={{ userSelect: 'none' }}>
-            {positionedNodes.filter(n => n.isEntity).length} Entitäten · {positionedNodes.filter(n => !n.isEntity).length} Personas · {positionedLinks.length} Verbindungen
+            {visibleNodes.filter(n => n.isEntity).length} Entitäten · {visibleNodes.filter(n => !n.isEntity).length} Personas · {visibleLinks.length} Verbindungen
           </text>
         </g>
       </svg>
-      <SearchBox nodes={positionedNodes} onSelect={handleSearchSelect} />
+      <SearchBox nodes={visibleNodes} onSelect={handleSearchSelect} />
+      <EntityLegend
+        nodes={positionedNodes}
+        hiddenTypes={hiddenTypes}
+        onToggle={handleToggleType}
+      />
       <GraphControls
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
