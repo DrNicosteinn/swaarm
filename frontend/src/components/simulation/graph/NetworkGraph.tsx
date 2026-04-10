@@ -15,6 +15,7 @@ import { ClusterHulls } from './layers/ClusterHulls'
 import { EdgesLayer } from './layers/EdgesLayer'
 import { NodesLayer } from './layers/NodesLayer'
 import { THEME } from './utils/colors'
+import { GraphControls } from './controls/GraphControls'
 
 export interface NetworkGraphProps {
   nodes: StreamNode[]
@@ -113,6 +114,40 @@ export function NetworkGraph({
     onNodeSelect(null)
   }, [onNodeSelect])
 
+  const handleZoomIn = useCallback(() => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    select(svgRef.current).call(zoomBehaviorRef.current.scaleBy, 1.4)
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    select(svgRef.current).call(zoomBehaviorRef.current.scaleBy, 0.7)
+  }, [])
+
+  const handleReset = useCallback(() => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    select(svgRef.current).call(zoomBehaviorRef.current.transform, zoomIdentity)
+  }, [])
+
+  const handleFitToContent = useCallback(() => {
+    if (!svgRef.current || !zoomBehaviorRef.current || positionedNodes.length === 0) return
+    const xs = positionedNodes.map(n => n.x ?? 0)
+    const ys = positionedNodes.map(n => n.y ?? 0)
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    const contentW = maxX - minX + 120
+    const contentH = maxY - minY + 120
+    const scale = Math.min(width / contentW, height / contentH, 2)
+    const tx = width / 2 - ((minX + maxX) / 2) * scale
+    const ty = height / 2 - ((minY + maxY) / 2) * scale
+    select(svgRef.current).call(
+      zoomBehaviorRef.current.transform,
+      zoomIdentity.translate(tx, ty).scale(scale),
+    )
+  }, [positionedNodes, width, height])
+
   return (
     <div
       className="relative w-full h-full overflow-hidden"
@@ -169,6 +204,12 @@ export function NetworkGraph({
           </text>
         </g>
       </svg>
+      <GraphControls
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onFitToContent={handleFitToContent}
+        onReset={handleReset}
+      />
     </div>
   )
 }
